@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Dispensa Inteligente - Dashboard</title>
+
+    <!-- 1. Fontes do Google -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- 2. Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <!-- 3. Suas Configurações do Tailwind -->
+    <script src="./js/tailwind-config.js"></script>
+
+    <!-- 4. Seus Estilos Customizados -->
+    <link href="./css/style.css" rel="stylesheet" />
+  </head>
+  <body
+    class="bg-background text-on-background font-body-md text-body-md antialiased flex h-screen overflow-hidden"
+  >
+    <!-- SideNavBar -->
+    <aside
+      class="hidden lg:flex flex-col h-screen fixed left-0 top-0 p-md w-64 bg-surface-container-lowest border-r border-outline-variant shadow-md z-40"
+    >
+      <div class="flex items-center gap-sm mb-lg">
+        <div
+          class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high shrink-0"
+        >
+          <img
+            alt="User profile"
+            class="w-full h-full object-cover"
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoV9PPGtKWMClYUY8WNeTtxtzlfnNZlguV90vJXsAVXjnz4SGcFA-t9ycCCSxP3zbaUAAg67daq8N1mJvNMPXfNUWdsLgIUFNq3vWJ7AM0GK30GcmKxMFAfj1_nn13xZZec-MyoOmLWkcb7NL_-8xehe9aRlBTxsCR3POtA10lLYoUWZxPjAxss9hoClW-Wk5REgAy_HbFnUO4b4x7j106tiSZFmfdZRsXQEnbmu1zQC-p8-pwaz50OdYrs9dYB0jI2B0pyUEsiLM"
+          />
+        </div>
+        <div class="overflow-hidden">
+          <h2
+            class="font-label-md text-label-md text-primary font-bold truncate"
+          >
+            Gerente de Cozinha
+          </h2>
+          <p
+            class="font-label-sm text-label-sm text-on-surface-variant truncate"
+          >
+            Conta Premium
+          </p>
+        </div>
+      </div>
+      <nav class="flex-1 flex flex-col gap-base">
+        <a
+          class="flex items-center gap-sm px-sm py-3 bg-secondary-container text-on-secondary-container rounded-lg font-bold font-label-md text-label-md hover:bg-surface-container-high transition-all"
+          href="#"
+          style="transform: scale(0.95)"
+        >
+          <span class="material-symbols-outlined" data-icon="kitchen"
+            >kitchen</span
+          >
+          Minha Dispensa
+        </a>
+        <a
+          class="flex items-center gap-sm px-sm py-3 text-on-surface-variant hover:bg-surface-container rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-all"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="restaurant_menu"
+            >restaurant_menu</span
+          >
+          Receitas
+        </a>
+        <a
+          class="flex items-center gap-sm px-sm py-3 text-on-surface-variant hover:bg-surface-container rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-all"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="calendar_month"
+            >calendar_month</span
+          >
+          Plano de Refeições
+        </a>
+        <a
+          class="flex items-center gap-sm px-sm py-3 text-on-surface-variant hover:bg-surface-container rounded-lg font-label-md text-label-md hover:bg-surface-container-high transition-all"
+          href="#"
+        >
+          <span class="material-symbols-outlined" data-icon="settings"
+            >settings</span
+          >
+          Configurações
+        </a>
+      </nav>
+      <div class="mt-auto pt-lg">
+        <button
+          class="w-full flex items-center justify-center gap-2 bg-primary text-on-primary rounded-lg py-3 px-4 font-label-md text-label-md hover:opacity-90 transition-opacity"
+        >
+          <span class="material-symbols-outlined text-[18px]">add</span>
+          Adicionar Novo Ingrediente
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col min-w-0 lg:ml-64 h-full overflow-hidden">
+      <!-- TopAppBar -->
+      <header
+        class="bg-surface border-b border-outline-variant shadow-sm flex items-center justify-between px-margin-mobile md:px-margin-desktop h-16 w-full z-30 shrink-0"
+      >
+        <div class="flex items-center gap-sm">
+          <h1
+            class="font-headline-md text-headline-md font-bold text-primary tracking-tight"
+          >
+            Dispensa Inteligente
+          </h1>
+        </div>
+        <div class="flex items-center gap-md">
+          <button
+            class="text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high p-2 rounded-full"
+          >
+            <span class="material-symbols-outlined" data-icon="notifications"
+              >notifications</span
+            >
+          </button>
+          <button
+            class="text-on-surface-variant hover:text-primary transition-colors hover:bg-surface-container-high p-2 rounded-full hidden md:block"
+          >
+            <span class="material-symbols-outlined" data-icon="account_circle"
+              >account_circle</span
+            >
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Canvas -->
+      <main
+        class="flex-1 overflow-y-auto p-margin-mobile md:p-margin-desktop bg-background"
+      >
+        <div class="max-w-7xl mx-auto space-y-xl">
+          <!-- Bento Section 1: Search & Active Pantry -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-md">
+            <!-- Search & Add Card -->
+            <div
+              class="lg:col-span-1 bg-surface-container-lowest rounded-xl p-md custom-shadow-card border border-outline-variant/30 flex flex-col justify-center"
+            >
+              <h2 class="font-headline-md text-headline-md text-primary mb-sm">
+                Adicionar à Dispensa
+              </h2>
+              <p
+                class="font-body-md text-body-md text-on-surface-variant mb-md"
+              >
+                Registre novos ingredientes rapidamente para manter seu
+                inventário atualizado.
+              </p>
+              <div class="relative">
+                <span
+                  class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-primary opacity-70"
+                  >search</span
+                >
+                <input
+                  id="input-ingrediente"
+                  class="w-full bg-surface-container-lowest border border-tertiary-fixed-dim rounded-full py-3 pl-10 pr-4 font-body-md text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                  placeholder="Buscar ingredientes (ex: Alho)"
+                  type="text"
+                />
+              </div>
+            </div>
+
+            <!-- My Pantry Stock Card -->
+            <div
+              class="lg:col-span-2 bg-surface-container-lowest rounded-xl p-md custom-shadow-card border border-outline-variant/30"
+            >
+              <div class="flex items-center justify-between mb-md">
+                <h2 class="font-headline-md text-headline-md text-primary">
+                  Em Estoque Agora
+                </h2>
+                <button
+                  class="text-primary font-label-md text-label-md hover:underline"
+                >
+                  Ver Tudo
+                </button>
+              </div>
+              <div class="flex flex-wrap gap-base">
+                     <!-- Adicionamos o ID aqui e deixamos vazio -->
+                    <div id="lista-estoque" class="flex flex-wrap gap-base">
+                    <!-- O JavaScript vai injetar os ingredientes aqui -->
+                    </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Recipe Suggestions -->
+          <section>
+            <div class="flex items-center justify-between mb-md">
+              <h2
+                class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight"
+              >
+                Receitas Sugeridas para Você
+              </h2>
+              <span
+                class="font-label-sm text-label-sm text-on-surface-variant bg-surface-container px-3 py-1 rounded-full hidden sm:inline-block"
+                >Com base na sua dispensa</span
+              >
+            </div>
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-gutter"
+            >
+              <!-- Recipe Card 1 -->
+              <div
+                class="bg-surface-container-lowest rounded-xl overflow-hidden custom-shadow-card group cursor-pointer border border-outline-variant/20 hover:-translate-y-1 transition-transform duration-300"
+              >
+                <div
+                  class="relative aspect-video w-full overflow-hidden bg-surface-container-high"
+                >
+                  <img
+                    alt="Pasta dish"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8N-Tljzk9MEdDklh6lA-4KEIu1dgmySFkKc5qAd9ffcFIVlPV1zwLJZfw_EF_n-pM5xZBVEy7CM6AaKnSikL7gyoJo5HCZkZeuGCXbnwZxQ-_myw_4A9OOKrodD4a8OtxOnFFGMm0Yed_K0TrCi_1ty6Sde4RU1KBPJkfkYrOCcWR560Ozsis85C4s8ohqBYpdSG93uXDhAnjyoAsHUtsQfuJr2dJ2OzFj8VV_Ci21pi87o8dXKYkErodcF3e_y6ZWmbSiuChhEM"
+                  />
+                  <button
+                    class="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm p-1.5 rounded-full text-on-surface-variant hover:text-primary transition-colors shadow-sm"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[20px]"
+                      data-icon="favorite_border"
+                      >favorite_border</span
+                    >
+                  </button>
+                </div>
+                <div class="p-sm flex flex-col gap-xs">
+                  <h3
+                    class="font-headline-md text-[18px] leading-tight text-on-surface font-semibold truncate"
+                  >
+                    Massa Clássica de Tomate...
+                  </h3>
+                  <div
+                    class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm"
+                  >
+                    <span class="flex items-center gap-1"
+                      ><span class="material-symbols-outlined text-[14px]"
+                        >schedule</span
+                      >
+                      25 min</span
+                    >
+                    <span>•</span>
+                    <span>3/4 Ingredientes</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recipe Card 2 -->
+              <div
+                class="bg-surface-container-lowest rounded-xl overflow-hidden custom-shadow-card group cursor-pointer border border-outline-variant/20 hover:-translate-y-1 transition-transform duration-300"
+              >
+                <div
+                  class="relative aspect-video w-full overflow-hidden bg-surface-container-high"
+                >
+                  <img
+                    alt="Salad dish"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrMuL9YdkeNrgozbu53ZpGzy9UB9sltVyNs2S5aqx4neIWBEzsskYPdEUP_5M632dK5WbNXdlQEImeDJ1MJfmF-HCVUZMz8YqYCq_BleAWNmMiShQbqCmq3LPOWFiD2nvjN-j8pxYJC0pTGgp_qhdbiAB_z0mKTj_fExh_sk-iX0q5HiUFk3dfzJsW3JGeAr7X5vOtQWN4y4G-SK74y-Odl6CDybOjsYIL4lDosau3uPb3j1QlW4XYDHyqcohVDlIA2-ofNuVR4FM"
+                  />
+                  <button
+                    class="absolute top-2 right-2 bg-surface-container-lowest/90 backdrop-blur-sm p-1.5 rounded-full text-on-surface-variant hover:text-primary transition-colors shadow-sm"
+                  >
+                    <span
+                      class="material-symbols-outlined text-[20px]"
+                      data-icon="favorite_border"
+                      >favorite_border</span
+                    >
+                  </button>
+                </div>
+                <div class="p-sm flex flex-col gap-xs">
+                  <h3
+                    class="font-headline-md text-[18px] leading-tight text-on-surface font-semibold truncate"
+                  >
+                    Salada de Jardim Fresca
+                  </h3>
+                  <div
+                    class="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm"
+                  >
+                    <span class="flex items-center gap-1"
+                      ><span class="material-symbols-outlined text-[14px]"
+                        >schedule</span
+                      >
+                      10 min</span
+                    >
+                    <span>•</span>
+                    <span>4/5 Ingredientes</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recipe Card Placeholder 3 -->
+              <div
+                class="bg-surface-container-lowest rounded-xl overflow-hidden custom-shadow-card group cursor-pointer border border-outline-variant/20 hover:-translate-y-1 transition-transform duration-300"
+              >
+                <div
+                  class="relative aspect-video w-full overflow-hidden bg-surface-container-low flex items-center justify-center"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline text-[48px]"
+                    >soup_kitchen</span
+                  >
+                </div>
+                <div class="p-sm flex flex-col gap-xs">
+                  <div
+                    class="h-5 bg-surface-container rounded w-3/4 mb-1"
+                  ></div>
+                  <div class="h-3 bg-surface-container rounded w-1/2"></div>
+                </div>
+              </div>
+
+              <!-- Recipe Card Placeholder 4 -->
+              <div
+                class="bg-surface-container-lowest rounded-xl overflow-hidden custom-shadow-card border border-outline-variant border-dashed flex flex-col items-center justify-center p-md min-h-[200px] hover:bg-surface-container-low transition-colors cursor-pointer"
+              >
+                <span
+                  class="material-symbols-outlined text-primary mb-2"
+                  data-icon="explore"
+                  >explore</span
+                >
+                <span class="font-label-md text-label-md text-primary"
+                  >Descobrir Mais</span
+                >
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 3: Weekly Meal Plan -->
+          <section>
+            <h2
+              class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary tracking-tight mb-md"
+            >
+              Planejamento Semanal
+            </h2>
+            <div
+              class="grid grid-cols-1 md:grid-cols-7 gap-2 bg-surface-container-lowest p-2 rounded-xl custom-shadow-card border border-outline-variant/30"
+            >
+              <!-- Day Column (Planned) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >SEG</span
+                  >
+                </div>
+                <div
+                  class="bg-secondary-container/50 rounded-lg p-2 flex-1 border border-secondary-container hover:border-primary/40 cursor-pointer transition-colors flex flex-col justify-between"
+                >
+                  <span
+                    class="font-label-md text-label-md text-on-surface leading-tight text-sm"
+                    >Macarrão com Tomate e Manjericão</span
+                  >
+                  <span class="font-label-sm text-label-sm text-primary mt-2"
+                    >Jantar</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Empty) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >TER</span
+                  >
+                </div>
+                <div
+                  class="bg-surface rounded-lg p-2 flex-1 border border-outline-variant border-dashed flex items-center justify-center hover:bg-surface-container-low cursor-pointer transition-colors group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors text-[20px]"
+                    data-icon="add"
+                    >add</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Empty) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >QUA</span
+                  >
+                </div>
+                <div
+                  class="bg-surface rounded-lg p-2 flex-1 border border-outline-variant border-dashed flex items-center justify-center hover:bg-surface-container-low cursor-pointer transition-colors group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors text-[20px]"
+                    data-icon="add"
+                    >add</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Empty) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >QUI</span
+                  >
+                </div>
+                <div
+                  class="bg-surface rounded-lg p-2 flex-1 border border-outline-variant border-dashed flex items-center justify-center hover:bg-surface-container-low cursor-pointer transition-colors group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors text-[20px]"
+                    data-icon="add"
+                    >add</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Empty) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >SEX</span
+                  >
+                </div>
+                <div
+                  class="bg-surface rounded-lg p-2 flex-1 border border-outline-variant border-dashed flex items-center justify-center hover:bg-surface-container-low cursor-pointer transition-colors group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors text-[20px]"
+                    data-icon="add"
+                    >add</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Planned) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-primary font-bold uppercase tracking-wider"
+                    >SÁB</span
+                  >
+                </div>
+                <div
+                  class="bg-secondary-container/50 rounded-lg p-2 flex-1 border border-secondary-container hover:border-primary/40 cursor-pointer transition-colors flex flex-col justify-between"
+                >
+                  <span
+                    class="font-label-md text-label-md text-on-surface leading-tight text-sm"
+                    >Salada de Jardim</span
+                  >
+                  <span class="font-label-sm text-label-sm text-primary mt-2"
+                    >Almoço</span
+                  >
+                </div>
+              </div>
+              <!-- Day Column (Empty) -->
+              <div class="flex flex-col gap-2 min-h-[120px]">
+                <div class="text-center py-1 border-b border-primary/10">
+                  <span
+                    class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider"
+                    >DOM</span
+                  >
+                </div>
+                <div
+                  class="bg-surface rounded-lg p-2 flex-1 border border-outline-variant border-dashed flex items-center justify-center hover:bg-surface-container-low cursor-pointer transition-colors group"
+                >
+                  <span
+                    class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors text-[20px]"
+                    data-icon="add"
+                    >add</span
+                  >
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="h-8"></div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./js/app.js"></script>
+  </body>
+</html>
