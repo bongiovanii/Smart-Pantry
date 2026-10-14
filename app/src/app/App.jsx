@@ -1,23 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
+import IngredientModal from '../components/IngredientModal.jsx'
+import { createPantryItem, listPantryItems } from '../services/pantry.js'
+import { listRecipesByIngredients } from '../services/recipe.js'
 
-const recipes = [
-  {
-    title: 'Massa clássica de tomate',
-    time: '25 min',
-    ingredients: '3 de 4 ingredientes',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuB8N-Tljzk9MEdDklh6lA-4KEIu1dgmySFkKc5qAd9ffcFIVlPV1zwLJZfw_EF_n-pM5xZBVEy7CM6AaKnSikL7gyoJo5HCZkZeuGCXbnwZxQ-_myw_4A9OOKrodD4a8OtxOnFFGMm0Yed_K0TrCi_1ty6Sde4RU1KBPJkfkYrOCcWR560Ozsis85C4s8ohqBYpdSG93uXDhAnjyoAsHUtsQfuJr2dJ2OzFj8VV_Ci21pi87o8dXKYkErodcF3e_y6ZWmbSiuChhEM',
-  },
-  {
-    title: 'Salada de jardim fresca',
-    time: '10 min',
-    ingredients: '4 de 5 ingredientes',
-    image:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDrMuL9YdkeNrgozbu53ZpGzy9UB9sltVyNs2S5aqx4neIWBEzsskYPdEUP_5M632dK5WbNXdlQEImeDJ1MJfmF-HCVUZMz8YqYCq_BleAWNmMiShQbqCmq3LPOWFiD2nvjN-j8pxYJC0pTGgp_qhdbiAB_z0mKTj_fExh_sk-iX0q5HiUFk3dfzJsW3JGeAr7X5vOtQWN4y4G-SK74y-Odl6CDybOjsYIL4lDosau3uPb3j1QlW4XYDHyqcohVDlIA2-ofNuVR4FM',
-  },
-]
 
 const week = [
   { day: 'SEG', meal: 'Macarrão com tomate e manjericão', type: 'Jantar' },
@@ -29,7 +16,18 @@ const week = [
   { day: 'DOM' },
 ]
 
-function Sidebar() {
+const unitLabels = {
+  un: 'un',
+  g: 'g',
+  kg: 'kg',
+  ml: 'ml',
+  l: 'l',
+  pacote: 'pacote',
+  caixa: 'caixa',
+  lata: 'lata',
+}
+
+function Sidebar({ onNewIngredient }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-outline-variant bg-white p-6 lg:flex">
       <div className="mb-10 flex items-center gap-3">
@@ -61,7 +59,11 @@ function Sidebar() {
         </a>
       </nav>
 
-      <button className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-container">
+      <button
+        className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
+        onClick={onNewIngredient}
+        type="button"
+      >
         <span className="material-symbols-outlined text-xl">add</span>
         Novo ingrediente
       </button>
@@ -92,23 +94,133 @@ function MobileNavigation() {
   )
 }
 
+function formatQuantity(quantity, unit) {
+  const value = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(
+    Number(quantity),
+  )
+  return `${value} ${unitLabels[unit] || unit}`
+}
+
+function formatExpiration(date) {
+  if (!date) return 'Sem validade informada'
+
+  return `Validade: ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(
+    new Date(`${date}T00:00:00Z`),
+  )}`
+}
+
 function App() {
-  const [ingredients, setIngredients] = useState(['Banana', 'Maçã', 'Pão', 'Leite'])
-  const [newIngredient, setNewIngredient] = useState('')
+  const [ingredients, setIngredients] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [recipes, setRecipes] = useState([])
+  const [isRecipesLoading, setIsRecipesLoading] = useState(false)
+  const [recipeError, setRecipeError] = useState('')
+  const lastRecipeRequest = useRef('')
 
-  function addIngredient(event) {
-    event.preventDefault()
-    const value = newIngredient.trim()
+  async function loadIngredients() {
+    setIsLoading(true)
+    setLoadError('')
 
-    if (!value) return
+    try {
+      setIngredients(await listPantryItems())
+    } catch (error) {
+      setLoadError(error.message || 'Não foi possível carregar a despensa.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-    setIngredients((current) => [...current, value])
-    setNewIngredient('')
+  // Carrega a despensa uma única vez quando a aplicação é aberta.
+  useEffect(() => {
+    let isActive = true
+
+    listPantryItems()
+      .then((items) => {
+        if (isActive) setIngredients(items)
+      })
+      .catch((error) => {
+        if (isActive) {
+          setLoadError(error.message || 'Não foi possível carregar a despensa.')
+        }
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false)
+      })
+
+    // Impede atualizações de estado caso o componente seja desmontado.
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  // Busca novas sugestões sempre que os ingredientes da despensa mudam.
+  useEffect(() => {
+    // Criamos uma identificação estável baseada nos ingredientes atuais.
+    const ingredientKey = ingredients
+      .map((ingredient) =>
+        ingredient.name.trim().toLocaleLowerCase('pt-BR'),
+      )
+      .filter(Boolean)
+      .sort()
+      .join('|')
+
+    // Sem ingredientes, não precisamos consultar receitas.
+    if (!ingredientKey) return
+
+    // Evita repetir a mesma chamada, economizando a cota da Spoonacular.
+    if (lastRecipeRequest.current === ingredientKey) return
+
+    // Registra que esta combinação já está sendo consultada.
+    lastRecipeRequest.current = ingredientKey
+    setIsRecipesLoading(true)
+    setRecipeError('')
+
+    // Passamos os objetos da despensa diretamente para o serviço.
+    listRecipesByIngredients(ingredients, { limit: 6 })
+      .then((results) => {
+        // Só atualizamos a tela se esta ainda for a consulta mais recente.
+        if (lastRecipeRequest.current === ingredientKey) {
+          setRecipes(results)
+          setRecipeError('')
+        }
+      })
+      .catch((error) => {
+        if (lastRecipeRequest.current === ingredientKey) {
+          setRecipeError(
+            error.message || 'Não foi possível carregar as receitas.',
+          )
+          setRecipes([])
+          setIsRecipesLoading(false)
+
+          // Libera a combinação para uma futura tentativa.
+          lastRecipeRequest.current = ''
+        }
+      })
+      .finally(() => {
+        if (lastRecipeRequest.current === ingredientKey) {
+          setIsRecipesLoading(false)
+        }
+      })
+  }, [ingredients])
+
+  async function addIngredient(form) {
+    setIsSaving(true)
+
+    try {
+      const newItem = await createPantryItem(form)
+      setIngredients((current) => [newItem, ...current])
+      setIsModalOpen(false)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <div className="min-h-dvh bg-background text-on-background">
-      <Sidebar />
+      <Sidebar onNewIngredient={() => setIsModalOpen(true)} />
 
       <div className="min-h-dvh lg:ml-64">
         <AppHeader />
@@ -120,34 +232,20 @@ function App() {
                 Minha despensa
               </p>
               <h1 className="text-2xl font-bold tracking-tight text-primary">
-                Adicionar ingrediente rápido
+                Cadastre seus ingredientes
               </h1>
               <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-                Registre os alimentos da sua casa e mantenha o estoque atualizado.
+                Registre manualmente os alimentos da sua casa e mantenha o estoque atualizado.
               </p>
 
-              <form className="mt-5 flex gap-2" onSubmit={addIngredient}>
-                <label className="relative min-w-0 flex-1">
-                  <span className="sr-only">Nome do ingrediente</span>
-                  <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xl text-primary/70">
-                    search
-                  </span>
-                  <input
-                    className="w-full rounded-full border border-tertiary-fixed-dim bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                    placeholder="Ex.: Alho"
-                    type="text"
-                    value={newIngredient}
-                    onChange={(event) => setNewIngredient(event.target.value)}
-                  />
-                </label>
-                <button
-                  className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary text-white transition hover:bg-primary-container"
-                  type="submit"
-                  aria-label="Adicionar ingrediente"
-                >
-                  <span className="material-symbols-outlined">add</span>
-                </button>
-              </form>
+              <button
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
+                onClick={() => setIsModalOpen(true)}
+                type="button"
+              >
+                <span className="material-symbols-outlined text-xl">add</span>
+                Novo ingrediente
+              </button>
             </article>
 
             <article className="surface-card p-5 sm:p-6 lg:col-span-2">
@@ -158,20 +256,66 @@ function App() {
                   </p>
                   <h2 className="mt-1 text-xl font-bold text-primary">Em estoque agora</h2>
                 </div>
-                <button className="shrink-0 text-sm font-bold text-primary hover:underline">
-                  Ver tudo
-                </button>
+                {!isLoading && !loadError && (
+                  <span className="shrink-0 rounded-full bg-secondary-container px-3 py-1 text-xs font-bold text-primary">
+                    {ingredients.length} {ingredients.length === 1 ? 'item' : 'itens'}
+                  </span>
+                )}
               </div>
 
-              <div className="flex flex-wrap gap-2" aria-live="polite">
-                {ingredients.map((ingredient, index) => (
-                  <span
-                    className="rounded-full border border-secondary-container bg-secondary-container px-3 py-2 text-sm font-semibold text-primary transition hover:border-primary/30"
-                    key={`${ingredient}-${index}`}
-                  >
-                    {ingredient}
-                  </span>
-                ))}
+              <div aria-live="polite">
+                {isLoading && (
+                  <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
+                    <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                    Carregando sua despensa...
+                  </div>
+                )}
+
+                {!isLoading && loadError && (
+                  <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800" role="alert">
+                    <p className="font-bold">Não foi possível acessar a despensa.</p>
+                    <p className="mt-1">{loadError}</p>
+                    <button className="mt-3 font-bold underline" onClick={loadIngredients} type="button">
+                      Tentar novamente
+                    </button>
+                  </div>
+                )}
+
+                {!isLoading && !loadError && ingredients.length === 0 && (
+                  <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-outline-variant bg-surface-container-low p-5 text-center">
+                    <div>
+                      <span className="material-symbols-outlined text-4xl text-primary">inventory_2</span>
+                      <p className="mt-2 font-bold text-primary">Sua despensa está vazia</p>
+                      <p className="mt-1 text-sm text-on-surface-variant">
+                        Cadastre o primeiro ingrediente para começar.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {!isLoading && !loadError && ingredients.length > 0 && (
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {ingredients.map((ingredient) => (
+                      <li className="rounded-xl border border-outline-variant bg-white p-4" key={ingredient.id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-bold text-on-surface">{ingredient.name}</p>
+                            <p className="mt-1 text-xs capitalize text-on-surface-variant">
+                              {ingredient.category}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-bold text-primary">
+                            {formatQuantity(ingredient.quantity, ingredient.unit)}
+                          </span>
+                        </div>
+                        <p className="mt-3 flex items-center gap-1.5 text-xs text-on-surface-variant">
+                          <span className="material-symbols-outlined text-base">event</span>
+                          {formatExpiration(ingredient.expiration_date)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </article>
           </section>
@@ -191,20 +335,52 @@ function App() {
               </span>
             </div>
 
+            {recipeError && (
+              <p
+                className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"
+                role="alert"
+              >
+                {recipeError}
+              </p>
+            )}
+
             <div className="recipe-grid">
               {recipes.map((recipe) => (
-                <FeatureCard key={recipe.title} {...recipe} />
+                <FeatureCard key={recipe.id} {...recipe} />
               ))}
 
-              <article className="surface-card min-h-56 overflow-hidden">
-                <div className="grid aspect-video place-items-center bg-surface-container-low">
-                  <span className="material-symbols-outlined text-5xl text-outline">soup_kitchen</span>
-                </div>
-                <div className="space-y-3 p-4" aria-hidden="true">
-                  <div className="h-4 w-3/4 rounded bg-surface-container" />
-                  <div className="h-3 w-1/2 rounded bg-surface-container" />
-                </div>
-              </article>
+              {isRecipesLoading && (
+                <article className="surface-card min-h-56 overflow-hidden">
+                  <div className="grid aspect-video place-items-center bg-surface-container-low">
+                    <span className="material-symbols-outlined animate-spin text-5xl text-outline">
+                      progress_activity
+                    </span>
+                  </div>
+                  <div className="space-y-3 p-4" aria-hidden="true">
+                    <div className="h-4 w-3/4 rounded bg-surface-container" />
+                    <div className="h-3 w-1/2 rounded bg-surface-container" />
+                  </div>
+                </article>
+              )}
+
+              {!isRecipesLoading &&
+                !recipeError &&
+                ingredients.length > 0 &&
+                recipes.length === 0 && (
+                  <article className="surface-card grid min-h-56 place-items-center p-5 text-center">
+                    <div>
+                      <span className="material-symbols-outlined text-4xl text-primary">
+                        search_off
+                      </span>
+                      <p className="mt-2 font-bold text-primary">
+                        Nenhuma receita encontrada
+                      </p>
+                      <p className="mt-1 text-sm text-on-surface-variant">
+                        Tente cadastrar outros ingredientes na despensa.
+                      </p>
+                    </div>
+                  </article>
+                )}
 
               <button className="surface-card flex min-h-56 flex-col items-center justify-center border-dashed p-5 text-primary transition hover:bg-surface-container-low">
                 <span className="material-symbols-outlined mb-2 text-3xl">explore</span>
@@ -250,6 +426,12 @@ function App() {
       </div>
 
       <MobileNavigation />
+      <IngredientModal
+        isOpen={isModalOpen}
+        isSaving={isSaving}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={addIngredient}
+      />
     </div>
   )
 }
