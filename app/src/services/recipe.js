@@ -92,7 +92,45 @@ function normalizeRecipe(recipe) {
     // steps vem embutido do Gemini — sem segunda requisição necessária.
     steps: Array.isArray(recipe.steps) ? recipe.steps : [],
     ingredients: `${usedIngredientCount} ingrediente${usedIngredientCount === 1 ? '' : 's'} da despensa`,
+    // Metadados da imagem real (Wikimedia Commons) ou do fallback por categoria.
+    imageQuery: recipe.imageQuery || '',
+    imageSource: recipe.imageSource || '',
+    imageAuthor: recipe.imageAuthor || '',
+    imageLicense: recipe.imageLicense || '',
+    imageLicenseUrl: recipe.imageLicenseUrl || '',
+    imageSourceUrl: recipe.imageSourceUrl || '',
   }
+}
+
+/**
+ * Extrai a mensagem devolvida pela Edge Function.
+ *
+ * O SDK do Supabase guarda a resposta HTTP em `error.context`; sem isso, o
+ * frontend exibiria sempre o mesmo texto genérico e esconderia a causa real
+ * (modelo indisponível, cota excedida, chave inválida etc.).
+ */
+async function getFunctionErrorMessage(error) {
+  const fallback = 'Não foi possível carregar as receitas.'
+
+  try {
+    const context = error?.context
+
+    if (context && typeof context.clone === 'function') {
+      const payload = await context.clone().json()
+
+      if (payload?.error) {
+        const detail =
+          import.meta.env.DEV && payload?.detail
+            ? ` Detalhe: ${payload.detail}`
+            : ''
+        return `${payload.error}${detail}`
+      }
+    }
+  } catch {
+    // Se a resposta não for JSON, mantemos a mensagem genérica.
+  }
+
+  return fallback
 }
 
 /**
@@ -135,7 +173,7 @@ export async function listRecipesByIngredients(ingredients, options = {}) {
 
   // O SDK coloca falhas de rede ou da Edge Function na propriedade error.
   if (error) {
-    throw new Error('Não foi possível carregar as receitas.', {
+    throw new Error(await getFunctionErrorMessage(error), {
       cause: error,
     })
   }
@@ -181,6 +219,12 @@ export async function getRecipeDetails(recipe) {
     steps: recipe.steps ?? [],
     usedIngredients: recipe.usedIngredients ?? [],
     missedIngredients: recipe.missedIngredients ?? [],
+    imageQuery: recipe.imageQuery ?? '',
+    imageSource: recipe.imageSource ?? '',
+    imageAuthor: recipe.imageAuthor ?? '',
+    imageLicense: recipe.imageLicense ?? '',
+    imageLicenseUrl: recipe.imageLicenseUrl ?? '',
+    imageSourceUrl: recipe.imageSourceUrl ?? '',
   })
 }
 

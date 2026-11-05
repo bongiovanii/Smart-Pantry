@@ -180,7 +180,7 @@ function App() {
     // Sem ingredientes, não precisamos consultar receitas.
     if (!ingredientKey) return
 
-    // Evita repetir a mesma chamada, economizando a cota da Spoonacular.
+    // Evita repetir a mesma chamada, economizando a cota do Gemini.
     if (lastRecipeRequest.current === ingredientKey) return
 
     // Registra que esta combinação já está sendo consultada.

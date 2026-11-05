@@ -1,4 +1,4 @@
-function FeatureCard({ title, time, ingredients, image, onClick }) {
+function FeatureCard({ title, time, ingredients, image, imageSource, onClick }) {
   return (
     <article
       aria-label={`Ver detalhes da receita ${title}`}
@@ -19,6 +19,11 @@ function FeatureCard({ title, time, ingredients, image, onClick }) {
           src={image}
           alt={title}
         />
+        {imageSource === 'wikimedia-commons' && (
+          <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+            Foto: Wikimedia Commons
+          </span>
+        )}
         <button
           className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface-variant shadow-sm backdrop-blur transition hover:text-primary"
           aria-label={`Favoritar ${title}`}

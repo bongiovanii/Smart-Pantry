@@ -77,6 +77,26 @@ function RecipeDetailModal({ isOpen, recipe, onClose, onCook }) {
 
         {/* Corpo com Rolagem */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
+          {(recipe.imageSource === 'wikimedia-commons' || recipe.imageSourceUrl) && (
+            <p className="mb-4 text-[11px] leading-4 text-on-surface-variant">
+              Foto: {recipe.imageAuthor || 'Wikimedia Commons'}
+              {recipe.imageLicense ? ` · ${recipe.imageLicense}` : ''}
+              {recipe.imageSourceUrl && (
+                <>
+                  {' · '}
+                  <a
+                    className="underline hover:text-primary"
+                    href={recipe.imageSourceUrl}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    ver fonte
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+
           {/* Métricas rápidas */}
           <div className="mb-6 flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-1.5 rounded-full bg-secondary-container px-3 py-1.5 text-xs font-bold text-primary">
