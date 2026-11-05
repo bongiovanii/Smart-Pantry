@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
-import { createPantryItem, listPantryItems } from '../services/pantry.js'
+import RecipeDetailModal from '../components/RecipeDetailModal.jsx'
+import {
+  archivePantryItem,
+  createPantryItem,
+  listPantryItems,
+  updatePantryItem,
+} from '../services/pantry.js'
 import { listRecipesByIngredients } from '../services/recipe.js'
 
 
@@ -114,8 +120,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState(null)
+  const [deletingItem, setDeletingItem] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [recipes, setRecipes] = useState([])
+  const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [isRecipesLoading, setIsRecipesLoading] = useState(false)
   const [recipeError, setRecipeError] = useState('')
   const lastRecipeRequest = useRef('')
@@ -206,21 +216,56 @@ function App() {
       })
   }, [ingredients])
 
-  async function addIngredient(form) {
+  function openNewModal() {
+    setEditingItem(null)
+    setIsModalOpen(true)
+  }
+
+  function openEditModal(item) {
+    setEditingItem(item)
+    setIsModalOpen(true)
+  }
+
+  async function handleSaveIngredient(form) {
     setIsSaving(true)
 
     try {
-      const newItem = await createPantryItem(form)
-      setIngredients((current) => [newItem, ...current])
+      if (editingItem) {
+        const updated = await updatePantryItem(editingItem.id, form)
+        setIngredients((current) =>
+          current.map((item) => (item.id === updated.id ? updated : item)),
+        )
+      } else {
+        const newItem = await createPantryItem(form)
+        setIngredients((current) => [newItem, ...current])
+      }
       setIsModalOpen(false)
+      setEditingItem(null)
     } finally {
       setIsSaving(false)
     }
   }
 
+  async function handleConfirmDelete() {
+    if (!deletingItem) return
+    setIsDeleting(true)
+
+    try {
+      await archivePantryItem(deletingItem.id)
+      setIngredients((current) =>
+        current.filter((item) => item.id !== deletingItem.id),
+      )
+      setDeletingItem(null)
+    } catch (error) {
+      alert(error.message || 'Não foi possível remover o ingrediente.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-background text-on-background">
-      <Sidebar onNewIngredient={() => setIsModalOpen(true)} />
+      <Sidebar onNewIngredient={openNewModal} />
 
       <div className="min-h-dvh lg:ml-64">
         <AppHeader />
@@ -240,7 +285,7 @@ function App() {
 
               <button
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-container"
-                onClick={() => setIsModalOpen(true)}
+                onClick={openNewModal}
                 type="button"
               >
                 <span className="material-symbols-outlined text-xl">add</span>
@@ -296,22 +341,53 @@ function App() {
                 {!isLoading && !loadError && ingredients.length > 0 && (
                   <ul className="grid gap-3 sm:grid-cols-2">
                     {ingredients.map((ingredient) => (
-                      <li className="rounded-xl border border-outline-variant bg-white p-4" key={ingredient.id}>
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-bold text-on-surface">{ingredient.name}</p>
-                            <p className="mt-1 text-xs capitalize text-on-surface-variant">
-                              {ingredient.category}
-                            </p>
+                      <li
+                        className="flex flex-col justify-between rounded-xl border border-outline-variant bg-white p-4 transition hover:border-primary/30"
+                        key={ingredient.id}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-bold text-on-surface">
+                                {ingredient.name}
+                              </p>
+                              <p className="mt-1 text-xs capitalize text-on-surface-variant">
+                                {ingredient.category}
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-bold text-primary">
+                              {formatQuantity(ingredient.quantity, ingredient.unit)}
+                            </span>
                           </div>
-                          <span className="shrink-0 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-bold text-primary">
-                            {formatQuantity(ingredient.quantity, ingredient.unit)}
-                          </span>
                         </div>
-                        <p className="mt-3 flex items-center gap-1.5 text-xs text-on-surface-variant">
-                          <span className="material-symbols-outlined text-base">event</span>
-                          {formatExpiration(ingredient.expiration_date)}
-                        </p>
+
+                        <div className="mt-3 flex items-center justify-between border-t border-outline-variant/30 pt-2.5">
+                          <p className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                            <span className="material-symbols-outlined text-base">event</span>
+                            {formatExpiration(ingredient.expiration_date)}
+                          </p>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              aria-label={`Editar ${ingredient.name}`}
+                              className="grid h-8 w-8 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-container hover:text-primary"
+                              onClick={() => openEditModal(ingredient)}
+                              title="Editar ingrediente"
+                              type="button"
+                            >
+                              <span className="material-symbols-outlined text-lg">edit</span>
+                            </button>
+                            <button
+                              aria-label={`Remover ${ingredient.name}`}
+                              className="grid h-8 w-8 place-items-center rounded-lg text-on-surface-variant transition hover:bg-red-50 hover:text-red-700"
+                              onClick={() => setDeletingItem(ingredient)}
+                              title="Remover ingrediente"
+                              type="button"
+                            >
+                              <span className="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                          </div>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -346,7 +422,11 @@ function App() {
 
             <div className="recipe-grid">
               {recipes.map((recipe) => (
-                <FeatureCard key={recipe.id} {...recipe} />
+                <FeatureCard
+                  key={recipe.id}
+                  onClick={() => setSelectedRecipe(recipe)}
+                  {...recipe}
+                />
               ))}
 
               {isRecipesLoading && (
@@ -427,11 +507,67 @@ function App() {
 
       <MobileNavigation />
       <IngredientModal
+        key={isModalOpen ? (editingItem ? `edit-${editingItem.id}` : 'new') : 'closed'}
+        editingItem={editingItem}
         isOpen={isModalOpen}
         isSaving={isSaving}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={addIngredient}
+        onClose={() => {
+          setIsModalOpen(false)
+          setEditingItem(null)
+        }}
+        onSubmit={handleSaveIngredient}
       />
+
+      {deletingItem && (
+        <div
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/45 p-4 backdrop-blur-[2px]"
+          role="dialog"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center gap-3 text-red-700">
+              <span className="material-symbols-outlined text-3xl">delete</span>
+              <h3 className="text-lg font-bold text-on-surface">Remover ingrediente</h3>
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
+              Deseja remover <strong>{deletingItem.name}</strong> da sua despensa? O item será arquivado do seu estoque atual.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-surface-container-low"
+                disabled={isDeleting}
+                onClick={() => setDeletingItem(null)}
+                type="button"
+              >
+                Cancelar
+              </button>
+              <button
+                className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-800 disabled:opacity-60"
+                disabled={isDeleting}
+                onClick={handleConfirmDelete}
+                type="button"
+              >
+                {isDeleting ? 'Removendo...' : 'Confirmar remoção'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedRecipe && (
+        <RecipeDetailModal
+          key={selectedRecipe.id}
+          isOpen={true}
+          onClose={() => setSelectedRecipe(null)}
+          onCook={(recipe) => {
+            setSelectedRecipe(null)
+            alert(
+              `A receita "${recipe.title}" foi selecionada! Na próxima etapa (Fase 3), conectaremos o registro de consumo diretamente à tabela stock_movements e ao estoque.`,
+            )
+          }}
+          recipe={selectedRecipe}
+        />
+      )}
     </div>
   )
 }

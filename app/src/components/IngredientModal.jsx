@@ -29,10 +29,22 @@ const units = [
   ['lata', 'Lata'],
 ]
 
-function IngredientModal({ isOpen, isSaving, onClose, onSubmit }) {
+function getInitialForm(editingItem) {
+  if (!editingItem) return initialForm
+  return {
+    name: editingItem.name || '',
+    category: editingItem.category || 'outros',
+    quantity: String(editingItem.quantity ?? '1'),
+    unit: editingItem.unit || 'un',
+    expirationDate: editingItem.expiration_date || '',
+  }
+}
+
+function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = null }) {
   const titleId = useId()
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState(() => getInitialForm(editingItem))
   const [error, setError] = useState('')
+  const isEditing = Boolean(editingItem)
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -75,7 +87,12 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit }) {
       await onSubmit(form)
       setForm(initialForm)
     } catch (submitError) {
-      setError(submitError.message || 'Não foi possível cadastrar o ingrediente.')
+      setError(
+        submitError.message ||
+          (isEditing
+            ? 'Não foi possível atualizar o ingrediente.'
+            : 'Não foi possível cadastrar o ingrediente.'),
+      )
     }
   }
 
@@ -98,14 +115,16 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit }) {
               Minha despensa
             </p>
             <h2 id={titleId} className="mt-1 text-2xl font-bold text-primary">
-              Novo ingrediente
+              {isEditing ? 'Editar ingrediente' : 'Novo ingrediente'}
             </h2>
             <p className="mt-2 text-sm leading-6 text-on-surface-variant">
-              Preencha os dados para incluir o item no seu estoque.
+              {isEditing
+                ? 'Atualize as informações do item em sua despensa.'
+                : 'Preencha os dados para incluir o item no seu estoque.'}
             </p>
           </div>
           <button
-            aria-label="Fechar cadastro"
+            aria-label={isEditing ? 'Fechar edição' : 'Fechar cadastro'}
             className="icon-button"
             disabled={isSaving}
             onClick={onClose}
@@ -204,7 +223,7 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit }) {
               disabled={isSaving}
               type="submit"
             >
-              {isSaving ? 'Salvando...' : 'Cadastrar'}
+              {isSaving ? 'Salvando...' : isEditing ? 'Salvar alterações' : 'Cadastrar'}
             </button>
           </div>
         </form>

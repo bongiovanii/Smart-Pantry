@@ -1,10 +1,9 @@
 // Importamos o cliente do Supabase já configurado no projeto.
 // A aplicação chamará uma Edge Function do Supabase em vez de acessar
-// diretamente a Spoonacular, mantendo a chave privada fora do navegador.
+// qualquer API de terceiros diretamente, mantendo as chaves privadas no servidor.
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 
-// Nome da Edge Function que será responsável por conversar com a Spoonacular.
-// Usar uma constante evita repetir uma string solta ao longo do arquivo.
+// Nome da Edge Function responsável por gerar receitas via Gemini API.
 const RECIPE_FUNCTION_NAME = 'recipe-suggestions'
 
 // Quantidade padrão de receitas exibidas no carrossel.
@@ -65,27 +64,33 @@ function normalizeLimit(limit) {
 }
 
 /**
- * Converte uma receita retornada pelo backend para o formato usado na tela.
- * Centralizar essa conversão evita que o App.jsx conheça detalhes da API.
+ * Converte uma receita retornada pelo Gemini (via Edge Function) para o
+ * formato usado na tela. Inclui steps e servings que agora vêm embutidos
+ * na primeira resposta, eliminando a necessidade de uma segunda requisição.
  */
 function normalizeRecipe(recipe) {
-  // Transformamos as contagens em números porque APIs podem devolver
-  // valores numéricos como strings dependendo da origem dos dados.
+  // As contagens chegam como inteiros do Gemini, mas garantimos número por segurança.
   const usedIngredientCount = Number(recipe.usedIngredientCount ?? 0)
   const missedIngredientCount = Number(recipe.missedIngredientCount ?? 0)
   const readyInMinutes = Number(recipe.readyInMinutes ?? 0)
+  const servings = Number(recipe.servings ?? 0)
 
-  // Retornamos um novo objeto contendo somente os dados úteis para o app.
+  // Retornamos um novo objeto contendo todos os dados necessários para o app,
+  // incluindo steps e servings que antes exigiam uma segunda chamada à API.
   return {
     id: recipe.id,
     title: recipe.title || 'Receita sem nome',
     image: recipe.image || '',
+    category: recipe.category || 'outros',
     readyInMinutes,
+    servings,
     time: readyInMinutes > 0 ? `${readyInMinutes} min` : 'Tempo não informado',
     usedIngredientCount,
     missedIngredientCount,
     usedIngredients: recipe.usedIngredients ?? [],
     missedIngredients: recipe.missedIngredients ?? [],
+    // steps vem embutido do Gemini — sem segunda requisição necessária.
+    steps: Array.isArray(recipe.steps) ? recipe.steps : [],
     ingredients: `${usedIngredientCount} ingrediente${usedIngredientCount === 1 ? '' : 's'} da despensa`,
   }
 }
@@ -148,3 +153,34 @@ export async function listRecipesByIngredients(ingredients, options = {}) {
   // map converte cada item da resposta para o formato interno do Smart Pantry.
   return recipes.map(normalizeRecipe)
 }
+
+/**
+ * Retorna os detalhes completos de uma receita.
+ *
+ * Com a migração para o Gemini, todos os dados (steps, servings, ingredientes)
+ * já vêm embutidos na resposta inicial de listRecipesByIngredients.
+ * Esta função simplesmente normaliza o objeto de receita recebido,
+ * mantendo o contrato de interface esperado pelo RecipeDetailModal.
+ *
+ * @param {Object} recipe Objeto de receita já normalizado (vindo do card)
+ * @returns {Promise<Object>} Dados completos da receita prontos para exibição
+ */
+export async function getRecipeDetails(recipe) {
+  if (!recipe || typeof recipe !== 'object') {
+    throw new Error('Dados da receita não fornecidos.')
+  }
+
+  // Retorna uma Promise resolvida imediatamente — sem requisição adicional.
+  // O Gemini já entregou steps, servings e ingredientes na primeira chamada.
+  return Promise.resolve({
+    id: recipe.id,
+    title: recipe.title,
+    image: recipe.image,
+    readyInMinutes: recipe.readyInMinutes ?? 0,
+    servings: recipe.servings ?? 0,
+    steps: recipe.steps ?? [],
+    usedIngredients: recipe.usedIngredients ?? [],
+    missedIngredients: recipe.missedIngredients ?? [],
+  })
+}
+

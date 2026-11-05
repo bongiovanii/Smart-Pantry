@@ -80,3 +80,42 @@ export async function createPantryItem(item) {
 
   return data
 }
+
+export async function updatePantryItem(id, item) {
+  await getCurrentSession()
+
+  const { data, error } = await supabase
+    .from('pantry_items')
+    .update({
+      name: item.name.trim(),
+      category: item.category,
+      quantity: Number(item.quantity),
+      unit: item.unit,
+      expiration_date: item.expirationDate || null,
+    })
+    .eq('id', id)
+    .select(pantryFields)
+    .single()
+
+  if (error) throw error
+
+  return data
+}
+
+export async function archivePantryItem(id) {
+  await getCurrentSession()
+
+  const { data, error } = await supabase
+    .from('pantry_items')
+    .update({
+      archived_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select(pantryFields)
+    .single()
+
+  if (error) throw error
+
+  return data
+}
+

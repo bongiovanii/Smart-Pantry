@@ -1,77 +1,44 @@
-// Endereço oficial do endpoint que procura receitas pelos ingredientes disponíveis.
 // Globals disponibilizados pelo runtime Deno das Supabase Edge Functions.
 declare const Deno: {
   env: { get(name: string): string | undefined }
   serve(handler: (request: Request) => Response | Promise<Response>): void
 }
 
-const SPOONACULAR_ENDPOINT =
-  'https://api.spoonacular.com/recipes/findByIngredients'
+// Endpoint REST do Gemini (generateContent API v1beta — sem SDK, compatível com Deno).
+const GEMINI_ENDPOINT =
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'
 
-// Limites definidos pelo Smart Pantry para controlar tamanho da requisição e cota.
+// Limites definidos pelo Smart Pantry para controlar tamanho da requisição.
 const MAX_INGREDIENTS = 20
 const DEFAULT_RECIPE_LIMIT = 6
 const MAX_RECIPE_LIMIT = 12
 
-// A Spoonacular reconhece os ingredientes deste endpoint em inglês.
-// Mantemos os nomes originais em português no banco e traduzimos somente
-// a cópia enviada à API externa.
-const INGREDIENT_TRANSLATIONS: Record<string, string> = {
-  acucar: 'sugar',
-  alho: 'garlic',
-  arroz: 'rice',
-  'arroz branco': 'white rice',
-  'arroz integral': 'brown rice',
-  aveia: 'oats',
-  azeite: 'olive oil',
-  bacon: 'bacon',
-  banana: 'banana',
-  batata: 'potato',
-  'batata doce': 'sweet potato',
-  berinjela: 'eggplant',
-  beterraba: 'beetroot',
-  brocolis: 'broccoli',
-  cafe: 'coffee',
-  carne: 'beef',
-  cenoura: 'carrot',
-  cebola: 'onion',
-  chocolate: 'chocolate',
-  couve: 'kale',
-  creme: 'cream',
-  ervilha: 'peas',
-  espinafre: 'spinach',
-  farinha: 'flour',
-  'farinha de trigo': 'wheat flour',
-  feijao: 'beans',
-  'feijao branco': 'white beans',
-  'feijao carioca': 'pinto beans',
-  'feijao preto': 'black beans',
-  frango: 'chicken',
-  iogurte: 'yogurt',
-  laranja: 'orange',
-  leite: 'milk',
-  lentilha: 'lentils',
-  limao: 'lemon',
-  linguica: 'sausage',
-  maca: 'apple',
-  macarrao: 'pasta',
-  manteiga: 'butter',
-  mandioca: 'cassava',
-  milho: 'corn',
-  morango: 'strawberry',
-  ovo: 'egg',
-  ovos: 'eggs',
-  pao: 'bread',
-  peixe: 'fish',
-  pera: 'pear',
-  pimentao: 'bell pepper',
-  presunto: 'ham',
-  queijo: 'cheese',
-  repolho: 'cabbage',
-  sal: 'salt',
-  tomate: 'tomato',
-  uva: 'grapes',
+// Mapeamento de categoria para imagem de alta qualidade do Unsplash.
+// Usado porque o Gemini é um modelo de linguagem e não retorna fotos.
+const CATEGORY_IMAGES: Record<string, string> = {
+  frango:
+    'https://images.unsplash.com/photo-1598103442097-8b74394b95c3?w=400&q=80',
+  carne:
+    'https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=400&q=80',
+  peixe:
+    'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&q=80',
+  massa:
+    'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?w=400&q=80',
+  arroz:
+    'https://images.unsplash.com/photo-1536304993881-ff86e3c74d3b?w=400&q=80',
+  salada:
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&q=80',
+  sopa: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&q=80',
+  sobremesa:
+    'https://images.unsplash.com/photo-1565958011703-44f9829ba187?w=400&q=80',
+  lanche:
+    'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=400&q=80',
+  outros:
+    'https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=400&q=80',
 }
+
+// Categorias válidas aceitas pelo schema do Gemini.
+const VALID_CATEGORIES = Object.keys(CATEGORY_IMAGES)
 
 // Headers CORS permitem que o frontend aberto no navegador chame a função.
 const corsHeaders = {
@@ -93,28 +60,16 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 // Limpa, limita e remove ingredientes repetidos recebidos do frontend.
+// Diferente da versão anterior, NÃO traduz para inglês — o Gemini entende PT-BR nativamente.
 function normalizeIngredients(value: unknown) {
-  // O corpo precisa conter um array. Outros tipos produzem uma lista vazia.
   if (!Array.isArray(value)) return []
 
-  // Mantemos apenas strings, removemos espaços e descartamos nomes vazios.
   const names = value
-    .filter((ingredient): ingredient is string => typeof ingredient === 'string')
-    .map((ingredient) => ingredient.trim())
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
     .filter(Boolean)
-    .map((ingredient) => {
-      // Remove acentos apenas para localizar a chave do dicionário.
-      const translationKey = ingredient
-        .toLocaleLowerCase('pt-BR')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
+    .map((item) => item.toLocaleLowerCase('pt-BR'))
 
-      // Ingredientes ainda não mapeados continuam funcionando caso o usuário
-      // já os tenha cadastrado em inglês.
-      return INGREDIENT_TRANSLATIONS[translationKey] ?? ingredient
-    })
-
-  // Set remove duplicados e slice impede requisições excessivamente grandes.
   return [...new Set(names)].slice(0, MAX_INGREDIENTS)
 }
 
@@ -124,23 +79,177 @@ function normalizeLimit(value: unknown) {
 
   if (!Number.isFinite(numericValue)) return DEFAULT_RECIPE_LIMIT
 
-  return Math.min(
-    Math.max(Math.trunc(numericValue), 1),
-    MAX_RECIPE_LIMIT,
-  )
+  return Math.min(Math.max(Math.trunc(numericValue), 1), MAX_RECIPE_LIMIT)
 }
 
-// Converte o retorno externo para o contrato interno usado pelo recipe.js.
-function normalizeRecipe(recipe: Record<string, unknown>) {
+// Define o schema JSON que o Gemini deve seguir ao gerar as receitas.
+// Structured Output garante que o JSON retornado tenha sempre a mesma forma.
+function buildRecipeSchema() {
   return {
-    id: recipe.id,
-    title: recipe.title,
-    image: recipe.image,
-    usedIngredientCount: recipe.usedIngredientCount ?? 0,
-    missedIngredientCount: recipe.missedIngredientCount ?? 0,
-    usedIngredients: recipe.usedIngredients ?? [],
-    missedIngredients: recipe.missedIngredients ?? [],
-    unusedIngredients: recipe.unusedIngredients ?? [],
+    type: 'object',
+    properties: {
+      recipes: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'string',
+              description:
+                'Identificador único da receita (slug em português, sem espaços).',
+            },
+            title: {
+              type: 'string',
+              description: 'Nome da receita em português do Brasil.',
+            },
+            category: {
+              type: 'string',
+              enum: VALID_CATEGORIES,
+              description:
+                'Categoria que melhor representa o prato principal desta receita.',
+            },
+            readyInMinutes: {
+              type: 'integer',
+              description: 'Tempo total de preparo em minutos.',
+            },
+            servings: {
+              type: 'integer',
+              description: 'Número de porções que a receita rende.',
+            },
+            usedIngredients: {
+              type: 'array',
+              description:
+                'Ingredientes que o usuário já possui e que serão usados nesta receita.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: 'Nome do ingrediente em português.',
+                  },
+                  amount: {
+                    type: 'string',
+                    description:
+                      'Quantidade com unidade (ex: "2 xícaras", "300g", "1 unidade").',
+                  },
+                },
+                required: ['name', 'amount'],
+              },
+            },
+            missedIngredients: {
+              type: 'array',
+              description:
+                'Ingredientes necessários que o usuário NÃO possui na dispensa.',
+              items: {
+                type: 'object',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: 'Nome do ingrediente em português.',
+                  },
+                  amount: {
+                    type: 'string',
+                    description:
+                      'Quantidade com unidade (ex: "2 colheres", "100ml").',
+                  },
+                },
+                required: ['name', 'amount'],
+              },
+            },
+            steps: {
+              type: 'array',
+              description:
+                'Passos do modo de preparo em ordem, cada um como uma instrução completa e clara.',
+              items: { type: 'string' },
+            },
+          },
+          required: [
+            'id',
+            'title',
+            'category',
+            'readyInMinutes',
+            'servings',
+            'usedIngredients',
+            'missedIngredients',
+            'steps',
+          ],
+        },
+      },
+    },
+    required: ['recipes'],
+  }
+}
+
+// Monta o corpo da requisição para o endpoint generateContent do Gemini.
+function buildGeminiRequest(ingredients: string[], limit: number) {
+  const systemInstruction = `Você é um chef especialista em culinária caseira brasileira e combate ao desperdício de alimentos.
+Suas receitas são práticas, saborosas, nutritivas e aproveitam ao máximo os ingredientes disponíveis.
+REGRAS OBRIGATÓRIAS:
+- Responda SEMPRE em português do Brasil (pt-BR), sem nenhuma palavra em inglês.
+- Priorize os ingredientes fornecidos pelo usuário como base das receitas.
+- Liste apenas ingredientes extras realmente necessários em missedIngredients.
+- Os passos de preparo (steps) devem ser claros, detalhados e em ordem lógica.
+- Gere receitas variadas: evite repetir o mesmo tipo de prato.
+- Use ingredientes e técnicas típicas da culinária brasileira.`
+
+  const userPrompt = `Ingredientes disponíveis na minha dispensa: ${ingredients.join(', ')}.
+
+Sugira até ${limit} receitas variadas que aproveitem esses ingredientes ao máximo.
+Priorize receitas que usem a maior parte dos ingredientes listados.
+Para cada receita, forneça: nome, categoria, tempo de preparo, porções, ingredientes que já tenho, ingredientes que faltam comprar e o modo de preparo passo a passo.`
+
+  return {
+    system_instruction: {
+      parts: [{ text: systemInstruction }],
+    },
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: userPrompt }],
+      },
+    ],
+    generationConfig: {
+      response_mime_type: 'application/json',
+      response_schema: buildRecipeSchema(),
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+    },
+  }
+}
+
+// Converte o retorno do Gemini para o contrato esperado pelo recipe.js.
+// Adiciona a imagem por categoria e os campos de contagem usados pelos cards.
+function normalizeGeminiRecipe(recipe: Record<string, unknown>) {
+  const usedIngredients = Array.isArray(recipe.usedIngredients)
+    ? recipe.usedIngredients
+    : []
+  const missedIngredients = Array.isArray(recipe.missedIngredients)
+    ? recipe.missedIngredients
+    : []
+  const steps = Array.isArray(recipe.steps) ? recipe.steps : []
+
+  const category =
+    typeof recipe.category === 'string' && VALID_CATEGORIES.includes(recipe.category)
+      ? recipe.category
+      : 'outros'
+
+  const readyInMinutes = Number(recipe.readyInMinutes ?? 0)
+  const servings = Number(recipe.servings ?? 1)
+
+  return {
+    id: typeof recipe.id === 'string' ? recipe.id : String(Date.now()),
+    title: typeof recipe.title === 'string' ? recipe.title : 'Receita sem nome',
+    category,
+    image: CATEGORY_IMAGES[category] ?? CATEGORY_IMAGES.outros,
+    readyInMinutes,
+    servings,
+    time: readyInMinutes > 0 ? `${readyInMinutes} min` : 'Tempo não informado',
+    usedIngredients,
+    missedIngredients,
+    usedIngredientCount: usedIngredients.length,
+    missedIngredientCount: missedIngredients.length,
+    ingredients: `${usedIngredients.length} ingrediente${usedIngredients.length === 1 ? '' : 's'} da despensa`,
+    steps,
   }
 }
 
@@ -156,12 +265,11 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: 'Método não permitido.' }, 405)
   }
 
-  // A chave fica armazenada nos secrets do Supabase e só existe no servidor.
-  const spoonacularApiKey = Deno.env.get('SPOONACULAR_API_KEY')
+  // A chave fica armazenada nos secrets do Supabase e nunca é exposta ao cliente.
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
 
-  // Não revelamos detalhes da chave quando ela estiver ausente.
-  if (!spoonacularApiKey) {
-    console.error('SPOONACULAR_API_KEY não foi configurada.')
+  if (!geminiApiKey) {
+    console.error('GEMINI_API_KEY não foi configurada nos secrets do Supabase.')
     return jsonResponse(
       { error: 'O serviço de receitas não está configurado.' },
       500,
@@ -169,8 +277,9 @@ Deno.serve(async (request) => {
   }
 
   try {
-    // request.json transforma o JSON enviado pelo recipe.js em um objeto.
     const body = await request.json()
+
+    // Normaliza e valida a lista de ingredientes enviada pelo frontend.
     const ingredients = normalizeIngredients(body?.ingredients)
     const limit = normalizeLimit(body?.limit)
 
@@ -182,58 +291,81 @@ Deno.serve(async (request) => {
       )
     }
 
-    // URL e URLSearchParams cuidam da codificação segura dos parâmetros.
-    const spoonacularUrl = new URL(SPOONACULAR_ENDPOINT)
-    spoonacularUrl.searchParams.set('ingredients', ingredients.join(','))
-    spoonacularUrl.searchParams.set('number', String(limit))
-    spoonacularUrl.searchParams.set('ranking', '1')
-    spoonacularUrl.searchParams.set('ignorePantry', 'true')
+    // Monta a requisição e chama o endpoint REST do Gemini.
+    const geminiRequest = buildGeminiRequest(ingredients, limit)
 
-    // A chave é enviada no header e nunca retorna para o navegador.
-    const spoonacularResponse = await fetch(spoonacularUrl, {
-      headers: {
-        Accept: 'application/json',
-        'x-api-key': spoonacularApiKey,
+    const geminiResponse = await fetch(
+      `${GEMINI_ENDPOINT}?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(geminiRequest),
       },
-    })
+    )
 
-    // Tentamos ler o JSON mesmo em erros para registrar um diagnóstico útil.
-    const spoonacularData = await spoonacularResponse.json()
+    // Lemos o JSON mesmo em caso de erro para registrar um diagnóstico útil.
+    const geminiData = await geminiResponse.json()
 
-    if (!spoonacularResponse.ok) {
-      console.error('Erro retornado pela Spoonacular.', {
-        status: spoonacularResponse.status,
-        response: spoonacularData,
+    if (!geminiResponse.ok) {
+      console.error('Erro retornado pela API do Gemini.', {
+        status: geminiResponse.status,
+        response: geminiData,
       })
 
-      // 429 indica excesso de chamadas; 402 costuma indicar cota esgotada.
-      if (
-        spoonacularResponse.status === 402 ||
-        spoonacularResponse.status === 429
-      ) {
+      // 429 = rate limit; 403 = chave inválida ou cota excedida.
+      if (geminiResponse.status === 429 || geminiResponse.status === 403) {
         return jsonResponse(
-          { error: 'A cota do serviço de receitas está indisponível.' },
+          { error: 'O serviço de receitas está temporariamente indisponível. Tente novamente em instantes.' },
           503,
         )
       }
 
       return jsonResponse(
-        { error: 'A Spoonacular não conseguiu processar a consulta.' },
+        { error: 'Não foi possível gerar sugestões de receitas.' },
         502,
       )
     }
 
-    // findByIngredients deve retornar diretamente um array de receitas.
-    if (!Array.isArray(spoonacularData)) {
-      console.error('Resposta inesperada da Spoonacular.', spoonacularData)
+    // O Gemini retorna o JSON gerado dentro de candidates[0].content.parts[0].text.
+    // Com response_mime_type: "application/json", o texto já é JSON válido.
+    const rawText =
+      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+
+    if (!rawText) {
+      console.error('Resposta vazia ou inesperada do Gemini.', geminiData)
+      return jsonResponse(
+        { error: 'O modelo não retornou receitas. Tente novamente.' },
+        502,
+      )
+    }
+
+    // Fazemos parse do JSON retornado pelo Gemini (Structured Output garante que seja válido).
+    let parsed: { recipes?: unknown[] }
+    try {
+      parsed = JSON.parse(rawText)
+    } catch (parseError) {
+      console.error('Falha ao fazer parse do JSON retornado pelo Gemini.', {
+        rawText,
+        parseError,
+      })
+      return jsonResponse(
+        { error: 'O modelo retornou uma resposta em formato inválido.' },
+        502,
+      )
+    }
+
+    if (!Array.isArray(parsed?.recipes)) {
+      console.error('O Gemini não retornou um array de receitas.', parsed)
       return jsonResponse(
         { error: 'O serviço de receitas retornou uma resposta inválida.' },
         502,
       )
     }
 
-    // map converte cada receita externa para o formato do Smart Pantry.
-    const recipes = spoonacularData.map(normalizeRecipe)
+    // Converte cada receita para o formato interno do Smart Pantry.
+    const recipes = (parsed.recipes as Record<string, unknown>[]).map(
+      normalizeGeminiRecipe,
+    )
 
     return jsonResponse({ recipes })
   } catch (error) {

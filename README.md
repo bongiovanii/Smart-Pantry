@@ -2,6 +2,14 @@
 
 Aplicação mobile-first para gestão de despensas domésticas, acompanhamento de validade, registro de consumo e descarte e sugestão de receitas.
 
+## Stack Tecnológica
+
+- **Backend / Runtime:** Node.js (tooling e scripts) e Supabase Edge Functions (serviços serverless protegidos).
+- **Interface (Frontend):** React + Vite (Tailwind CSS, design mobile-first responsivo).
+- **Banco de Dados (DB):** Supabase (PostgreSQL relacional com Row Level Security).
+- **Autenticação:** Supabase Auth (atualmente operando com sessão anônima; configuração de autenticação completa com credenciais/OAuth em andamento).
+- **Geração e Consulta de Receitas:** API Spoonacular integrada atualmente via Edge Function; evolução futura planejada para migração para Inteligência Artificial generativa (modelo Open Source ou Google AI Studio / Gemini API).
+
 ## Pastas principais
 
 - `app/`: nova aplicação React/Vite;

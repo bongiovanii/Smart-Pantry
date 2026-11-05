@@ -29,7 +29,7 @@ Essa estratégia permite:
 
 O trabalho é acompanhado por um quadro Kanban. O foco atual está na conclusão de pequenos fluxos de ponta a ponta, conectando interface, serviço, banco de dados e resposta apresentada ao usuário.
 
-## 4. Arquitetura atual do sistema
+## 4. Arquitetura atual do sistema e stack tecnológica
 
 A aplicação está organizada em camadas simples, com responsabilidades separadas:
 
@@ -37,12 +37,20 @@ A aplicação está organizada em camadas simples, com responsabilidades separad
 Usuário
    |
    v
-Interface React responsiva
+Interface React responsiva (Vite)
    |
    +--> Serviço da despensa --> Supabase Auth + PostgreSQL
    |
-   `--> Serviço de receitas --> Supabase Edge Function --> Spoonacular
+   `--> Serviço de receitas --> Supabase Edge Function --> Gemini API (Google AI Studio, PT-BR nativo)
 ```
+
+### Síntese da Stack Tecnológica
+
+- **Backend:** Node.js (ecossistema de execução, dependências e tooling) e Supabase Edge Functions (Deno/TypeScript) para isolamento de regras de integração e segurança.
+- **Interface (Frontend):** React com Vite, estruturado em componentes com foco mobile-first.
+- **Banco de Dados (DB):** Supabase (PostgreSQL relacional com Row Level Security - RLS).
+- **Autenticação:** Supabase Auth. *Situação atual:* opera com sessão anônima (`anon`) para viabilizar testes rápidos sem atrito. *Necessidade identificada:* configurar a autenticação formal no Supabase (e-mail/senha ou provedores sociais) para permitir persistência de conta entre múltiplos dispositivos e recuperação de acesso.
+- **Geração / Consulta de Receitas:** Gemini API (Google AI Studio) integrada via Supabase Edge Function com Structured Output (JSON Schema). Receitas geradas 100% em português do Brasil (PT-BR) com ingredientes, passos de preparo e metadados entregues em uma única requisição. Motor anterior (Spoonacular) removido.
 
 ### Interface da aplicação
 
@@ -66,7 +74,7 @@ O Supabase exerce três funções principais no projeto:
 
 1. identificar o usuário por meio de uma sessão anônima;
 2. armazenar os dados da despensa em um banco PostgreSQL;
-3. executar a Edge Function responsável pela integração com a Spoonacular.
+3. executar a Edge Function responsável pela integração com o Gemini API.
 
 A sessão anônima permite separar os dados de cada usuário sem exigir um cadastro tradicional nesta primeira versão. Essa escolha simplifica o acesso ao MVP, mas ainda permite aplicar regras de segurança por usuário.
 
@@ -151,36 +159,26 @@ Cada receita recebida é adaptada para o cartão da aplicação, contendo:
 
 O endpoint atual não fornece o tempo de preparo nessa mesma consulta. Por isso, o cartão apresenta **Tempo não informado** quando esse dado não existe.
 
-### 5.8 Integração protegida com a Spoonacular
+### 5.8 Integração protegida com o Gemini API (Google AI Studio)
 
-A chave privada da Spoonacular não fica armazenada no frontend. O React chama uma Supabase Edge Function chamada `recipe-suggestions`, e somente essa função se comunica com a API externa.
+A chave privada do Gemini não fica armazenada no frontend. O React chama uma Supabase Edge Function chamada `recipe-suggestions`, e somente essa função se comunica com a API do Gemini.
+
+A Edge Function usa **Structured Output** (`response_mime_type: "application/json"` + `response_schema`) para garantir que o Gemini sempre retorne o formato exato esperado pelo frontend, eliminando erros de parsing. Todas as receitas são geradas 100% em português do Brasil (PT-BR) por instrução de sistema — sem dicionários de tradução.
 
 O fluxo atual é:
 
 1. o React carrega os ingredientes da despensa;
-2. `recipe.js` extrai e normaliza os nomes;
+2. `recipe.js` extrai e normaliza os nomes (mantendo o PT-BR nativo);
 3. o Supabase autentica a chamada à Edge Function;
 4. a Edge Function valida a entrada e limita o tamanho da consulta;
-5. os ingredientes são adaptados para o idioma reconhecido pela Spoonacular;
-6. a Spoonacular retorna as sugestões;
-7. a Edge Function remove detalhes desnecessários e responde ao frontend;
-8. os dados são convertidos em cartões de receita.
+5. monta o prompt com os ingredientes e um JSON Schema estrito;
+6. o Gemini gera receitas completas em PT-BR (título, categoria, tempo, porções, ingredientes usados, faltantes e passos de preparo);
+7. a Edge Function mapeia uma imagem por categoria (Unsplash) e devolve o JSON normalizado;
+8. os dados são convertidos em cartões de receita e abertos no modal de detalhes instantaneamente.
 
-### 5.9 Adaptação de ingredientes em português
+### 5.9 Dados embutidos na primeira resposta
 
-Durante os testes, foi identificado que ingredientes enviados em português, como `arroz` e `feijão`, produziam uma resposta válida, porém vazia. Os mesmos termos em inglês retornavam receitas.
-
-Para contornar essa limitação, foi criada na Edge Function uma camada de tradução controlada para ingredientes comuns. Ela remove diferenças de maiúsculas, minúsculas e acentos para localizar a tradução adequada. Exemplos:
-
-- `arroz` → `rice`;
-- `feijão` → `beans`;
-- `feijão preto` → `black beans`;
-- `leite` → `milk`;
-- `tomate` → `tomato`.
-
-O banco continua armazenando os termos em português. A conversão existe somente na comunicação com a API externa. Quando um termo não está no dicionário, ele é enviado como foi cadastrado, permitindo também o uso direto de nomes em inglês.
-
-Essa solução é adequada ao MVP por ser simples, controlável e não depender de mais uma API. Em uma evolução futura, o dicionário poderá ser ampliado ou substituído por um serviço oficial de tradução.
+Com o Gemini, todos os dados da receita — incluindo passos de preparo (`steps`), tempo, porções e ingredientes — chegam na primeira (e única) chamada à Edge Function. O `RecipeDetailModal` abre instantaneamente sem precisar de uma segunda requisição, eliminando o estado de carregamento para o modo de preparo.
 
 ### 5.10 Tratamento dos estados da integração
 
@@ -191,7 +189,7 @@ A seção de receitas diferencia os seguintes estados:
 - nenhuma receita encontrada;
 - erro na consulta.
 
-Também existe uma proteção contra a repetição da mesma requisição. Isso reduz chamadas desnecessárias à Spoonacular e ajuda a preservar a cota do serviço externo.
+Também existe uma proteção contra a repetição da mesma requisição, reduzindo chamadas desnecessárias ao Gemini e preservando a cota do serviço.
 
 ## 6. Organização atual dos principais componentes
 
@@ -204,7 +202,7 @@ Também existe uma proteção contra a repetição da mesma requisição. Isso r
 | `pantry.js` | Executa os casos de consulta e cadastro da despensa. |
 | `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas. |
 | `supabase.js` | Centraliza a criação do cliente Supabase. |
-| `recipe-suggestions/index.ts` | Protege a chave externa, traduz ingredientes e consulta a Spoonacular. |
+| `recipe-suggestions/index.ts` | Protege a chave do Gemini, gera receitas em PT-BR via Structured Output e mapeia imagens por categoria. |
 | Migração inicial | Cria tabelas, relacionamentos, validações, índices e políticas de segurança. |
 
 ## 7. Decisões de engenharia já adotadas
@@ -225,6 +223,21 @@ O acesso ao Supabase e à API de receitas foi retirado dos componentes visuais. 
 
 O frontend contém apenas dados publicáveis necessários ao cliente Supabase. A chave da Spoonacular é armazenada como segredo da Edge Function e não é enviada ao navegador.
 
+### Transição de autenticação anônima para autenticação completa
+
+A autenticação anônima do Supabase Auth serviu como viabilizador para o MVP sem atrito de cadastro. Contudo, para o uso persistente entre múltiplos dispositivos e recuperação segura de conta, a configuração de autenticação formal (e-mail/senha ou OAuth) no Supabase é uma necessidade prioritária já planejada na arquitetura.
+
+### Decisão de Engenharia: Substituição da Spoonacular por IA Generativa (Google AI Studio / Gemini API)
+
+A API externa Spoonacular foi adotada inicialmente para validar o fluxo de ponta a ponta. Contudo, durante os testes com a base real e os primeiros cards de receitas, constatou-se que a Spoonacular opera de maneira estritamente em inglês e com severas limitações de flexibilidade. Foi tomada a decisão técnica de substituir o motor da Spoonacular pela **API Gemini (Google AI Studio)**.
+
+**Motivos e justificativas da decisão:**
+1. **Língua nativa e contexto cultural:** A Spoonacular não oferece suporte nativo a outro idioma. Dicionários manuais são viáveis para ingredientes isolados, mas incapazes de traduzir instruções dinâmicas de preparo sem distorções culinárias. O Gemini opera nativamente em português do Brasil (pt-BR), adaptando termos típicos como "alho picado", "azeite a gosto" e pratos populares brasileiros.
+2. **Combate ao desperdício superior (ODS 12):** A Spoonacular apenas pesquisa receitas fixas cadastradas em sua base estrangeira. Um modelo de linguagem atua como um consultor culinário, gerando combinações adaptadas e criativas para aproveitar sobras, talos e itens próximos da validade cadastrados na despensa.
+3. **Cota e viabilidade técnica no MVP:** O plano gratuito da Spoonacular limita o uso a 150 pontos/dia e exigia múltiplas requisições separadas (busca inicial + detalhamento de instruções). A API do Gemini via Google AI Studio oferece cota gratuita de até 1.500 requisições diárias sem necessidade de cartão de crédito e permite entregar ingredientes e passos estruturados em uma única chamada via *Structured Output* (JSON Schema).
+4. **Desempenho e experiência do usuário:** Com a IA devolvendo os passos do preparo no mesmo payload da receita, o modal de detalhes abre instantaneamente ao clique do usuário, eliminando a espera por uma segunda requisição.
+5. **Relevância acadêmica para o TCC:** Demonstra a aplicação prática de Engenharia de Software e IA Generativa orientada a um problema social e ambiental relevante.
+
 ### Evolução orientada por evidências
 
 As próximas definições devem distinguir claramente três situações:
@@ -239,15 +252,17 @@ Essa distinção será usada quando os requisitos forem revisados.
 
 | Área | Estado | Observação |
 |---|---|---|
-| Estrutura React/Vite | Implementada | Aplicação executável e com build de produção. |
-| Layout mobile-first | Implementado | Navegação e composição adaptáveis. |
-| Conexão Supabase | Implementada | Configurada por variáveis de ambiente. |
-| Sessão anônima | Implementada | Identifica e separa a despensa do usuário. |
-| Cadastro da despensa | Implementado | Formulário, validação, persistência e atualização da tela. |
+| Ambiente Backend / Node.js | Implementado | Runtime para build, tooling de desenvolvimento e funções serveless. |
+| Interface React/Vite | Implementada | Aplicação executável e com build de produção (mobile-first). |
+| Banco de dados Supabase (PostgreSQL) | Implementado | Armazenamento relacional e políticas de acesso (RLS). |
+| Autenticação anônima | Implementada | Identifica e separa a despensa do usuário localmente. |
+| Autenticação completa (Supabase Auth) | Planejada / Em configuração | Necessária para suporte a login multi-dispositivo e persistência definitiva. |
+| Gestão da despensa (CRUD) | Implementada | Cadastro, edição e exclusão suave (arquivamento) com validação e atualização reativa. |
 | Listagem da despensa | Implementada | Inclui carregamento, vazio e erro. |
 | Segurança RLS | Implementada no banco | Políticas vinculadas ao usuário. |
-| Sugestão de receitas | Implementada | Integração real por Edge Function. |
-| Tradução dos ingredientes | Implementada para termos mapeados | Dicionário inicial voltado ao MVP. |
+| Sugestão de receitas (Gemini / Google AI Studio) | Implementada | Geração via Edge Function + Structured Output em PT-BR nativo. |
+| Detalhamento de receitas (Gemini) | Implementado | Modal com tempo, porções, ingredientes faltantes/em estoque e modo de preparo passo a passo — dados embutidos na primeira resposta, sem segunda requisição. |
+| Geração de receitas por IA (Open Source / Google AI Studio) | Implementada (Gemini) | Motor migrado do Spoonacular para o Gemini 2.0 Flash com PT-BR nativo. |
 | Movimentação de estoque | Estruturada no banco | Ainda não existe fluxo na interface. |
 | Alertas de validade | Planejados | Ainda não existe regra ativa ou central de alertas. |
 | Planejamento semanal | Demonstrativo | Interface sem persistência. |
@@ -257,18 +272,14 @@ Essa distinção será usada quando os requisitos forem revisados.
 
 ## 9. Limitações conhecidas
 
-- O cadastro ainda não possui edição, exclusão ou arquivamento pela interface.
-- A quantidade do ingrediente não é atualizada por consumo ou entrada.
+- A quantidade do ingrediente ainda não é atualizada automaticamente por consumo ou entrada de estoque.
 - A tabela `stock_movements` ainda não recebe registros da aplicação.
 - Ainda não é possível registrar um descarte e seu motivo.
 - Os alertas de validade não foram implementados.
 - O planejamento semanal ainda é uma representação visual.
-- Os títulos e demais textos das receitas retornam no idioma fornecido pela Spoonacular.
-- O dicionário de ingredientes cobre termos comuns e precisará evoluir conforme novos alimentos forem cadastrados.
+- A autenticação anônima atual impede que o usuário acesse seus dados a partir de outro dispositivo ou recupere a conta caso limpe o navegador. É necessário configurar a autenticação completa no Supabase.
 - O botão para descobrir mais receitas e a ação de favoritar ainda não possuem fluxo completo.
-- A aplicação ainda não apresenta detalhes e modo de preparo da receita.
 - Não existe experiência offline nem instalação como PWA nesta etapa.
-- A autenticação anônima não oferece recuperação de conta em outro dispositivo.
 - Ainda será necessário ampliar a estratégia de testes automatizados e de observação de falhas.
 
 ## 10. Verificações realizadas até esta etapa
@@ -278,12 +289,14 @@ Durante a implementação foram realizados os seguintes controles:
 - execução do ESLint sem erros;
 - geração do build de produção pelo Vite;
 - verificação do carregamento da aplicação local;
-- confirmação de cadastro e consulta de ingredientes no Supabase;
+- confirmação de cadastro, consulta, edição e exclusão suave (arquivamento) de ingredientes no Supabase;
+- confirmação visual e reativa da despensa com diálogo de confirmação para exclusão;
 - verificação dos estados de carregamento, erro e lista vazia;
-- chamada real da Edge Function com autenticação;
-- teste da Spoonacular com ingredientes em português e inglês;
-- confirmação de receitas retornadas após a tradução no backend;
-- publicação da versão atualizada da função `recipe-suggestions`.
+- chamada real da Edge Function com autenticação para busca de receitas via Gemini API;
+- verificação do modal de detalhes com instruções passo a passo em PT-BR, tempo, porções e ingredientes faltantes vs em estoque;
+- confirmação de receitas geradas 100% em português do Brasil (PT-BR nativo via Gemini);
+- confirmação do carregamento instantâneo do modal (dados embutidos na primeira resposta);
+- publicação da versão atualizada da função `recipe-suggestions` com motor Gemini.
 
 Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas não substituem a avaliação com usuários nem a medição de redução do desperdício.
 
@@ -291,15 +304,14 @@ Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas
 
 A sequência deverá ser escolhida conforme o backlog e o tempo do projeto. A evolução mais coerente a partir da base atual inclui:
 
-1. permitir alterar e arquivar itens da despensa;
-2. registrar entrada, consumo, ajuste e descarte em `stock_movements`;
-3. atualizar a quantidade a partir das movimentações;
+1. registrar entrada, consumo, ajuste e descarte em `stock_movements`;
+2. atualizar a quantidade a partir das movimentações;
+3. configurar autenticação completa no Supabase (e-mail/senha ou OAuth) para permitir login seguro e multi-dispositivo;
 4. criar alertas derivados da data de validade;
-5. abrir os detalhes de uma receita e apresentar ingredientes faltantes;
-6. transformar o planejamento semanal em uma funcionalidade persistente;
-7. preparar dados para medir consumo e desperdício;
-8. avaliar PWA, funcionamento offline e empacotamento mobile;
-9. revisar os requisitos com base no software consolidado.
+5. transformar o planejamento semanal em uma funcionalidade persistente;
+6. preparar dados para medir consumo e desperdício;
+7. avaliar PWA, funcionamento offline e empacotamento mobile;
+8. revisar os requisitos com base no software consolidado.
 
 Essa lista orienta o desenvolvimento, mas não representa ainda uma especificação definitiva.
 

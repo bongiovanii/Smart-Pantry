@@ -12,16 +12,17 @@ O protótipo será preservado em `frontend/` como referência visual durante a m
 
 ## 3. Decisões técnicas
 
-| Decisão | Escolha inicial | Justificativa |
+| Decisão | Escolha inicial | Justificativa e evolução |
 |---|---|---|
 | Estratégia mobile | PWA mobile-first | Permite uso no navegador, instalação no aparelho e evolução gradual |
 | Empacotamento nativo | Capacitor após o MVP web | Reaproveita o frontend e evita complexidade nativa prematura |
 | Frontend | React com JavaScript | Facilita a divisão da interface em componentes e funcionalidades |
-| Ferramenta de construção | Vite | Fornece ambiente de desenvolvimento, módulos e build de produção |
+| Ferramenta de construção / Runtime | Vite e Node.js | Fornece ambiente de desenvolvimento, módulos, runtime e build de produção |
 | Estilos | Tailwind compilado | Preserva a identidade visual atual sem depender de CDN |
-| Banco de dados | Supabase PostgreSQL | Oferece persistência, API, autenticação e políticas de acesso |
-| Identidade inicial | Supabase Auth anônimo | Permite separar os dados por usuário sem exigir cadastro no MVP |
+| Banco de dados | Supabase PostgreSQL | Oferece persistência relacional, API, autenticação e políticas de acesso |
+| Identidade / Autenticação | Supabase Auth (anônimo -> credenciais completas) | Inicia com anônimo para validar o MVP; configuração de autenticação completa (e-mail/senha) necessária para multi-dispositivo |
 | Segurança | Row Level Security | Garante que cada usuário acesse somente os próprios registros |
+| Geração de receitas | Google AI Studio (Gemini API) | Substitui a Spoonacular para garantir 100% de suporte nativo a PT-BR, receitas adaptadas à despensa brasileira, cota gratuita ampla (1.500 req/dia) e Structured Output em JSON |
 | Integrações | Funções de servidor | Protege chaves privadas e desacopla APIs externas do frontend |
 | Gerência do trabalho | Kanban com WIP 1 | Adequado ao desenvolvimento individual e ao foco por requisito |
 | Processo | Iterativo e incremental | Cada etapa produz uma versão executável e verificável |
@@ -32,16 +33,16 @@ O protótipo será preservado em `frontend/` como referência visual durante a m
 Usuário
   |
   v
-PWA React / Vite
+PWA React / Vite (Node.js)
   |-- interface mobile-first
   |-- cache e estado local
   |-- cliente Supabase
   |
-  +---- Supabase Auth
+  +---- Supabase Auth (anônimo -> autenticação com credenciais)
   +---- Supabase PostgreSQL + RLS
   +---- Funções de servidor
-             |-- Open Food Facts
-             `-- Spoonacular
+             |-- Open Food Facts (planejado)
+             `-- Motor de receitas IA (Google AI Studio / Gemini API)
 
 Empacotamento posterior:
 PWA -> Capacitor -> Android / iOS
