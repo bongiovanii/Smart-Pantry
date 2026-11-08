@@ -56,6 +56,7 @@ function buildRecipeSnapshot(recipe, fallbackId, fallbackTitle) {
     category: recipe?.category || '',
     readyInMinutes: recipe?.readyInMinutes ?? 0,
     servings: recipe?.servings ?? 0,
+    caloriesPerServing: recipe?.caloriesPerServing ?? 0,
     usedIngredients: recipe?.usedIngredients ?? [],
     missedIngredients: recipe?.missedIngredients ?? [],
     steps: recipe?.steps ?? [],

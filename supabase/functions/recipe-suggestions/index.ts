@@ -673,6 +673,11 @@ function buildRecipeSchema() {
               type: 'integer',
               description: 'Número de porções que a receita rende.',
             },
+            caloriesPerServing: {
+              type: 'integer',
+              description:
+                'Estimativa de calorias por porção, em kcal, calculada a partir dos ingredientes e das quantidades da receita.',
+            },
             usedIngredients: {
               type: 'array',
               description:
@@ -727,6 +732,7 @@ function buildRecipeSchema() {
             'category',
             'readyInMinutes',
             'servings',
+            'caloriesPerServing',
             'usedIngredients',
             'missedIngredients',
             'steps',
@@ -749,13 +755,14 @@ REGRAS OBRIGATÓRIAS:
 - Os passos de preparo (steps) devem ser claros, detalhados e em ordem lógica.
 - Gere receitas variadas: evite repetir o mesmo tipo de prato.
 - Use ingredientes e técnicas típicas da culinária brasileira.
-- Para cada receita, informe imageQuery com o nome popular do prato em 2 a 5 palavras (ex.: "feijoada", "pão de queijo", "arroz carreteiro"), para busca de foto real.`
+- Para cada receita, informe imageQuery com o nome popular do prato em 2 a 5 palavras (ex.: "feijoada", "pão de queijo", "arroz carreteiro"), para busca de foto real.
+- Estime as calorias por porção (caloriesPerServing) em kcal, de forma coerente com os ingredientes e as quantidades informadas. Use um número inteiro e não invente precisão nutricional.`
 
   const userPrompt = `Ingredientes disponíveis na minha dispensa: ${ingredients.join(', ')}.
 
 Sugira até ${limit} receitas variadas que aproveitem esses ingredientes ao máximo.
 Priorize receitas que usem a maior parte dos ingredientes listados.
-Para cada receita, forneça: nome, imageQuery do prato, categoria, tempo de preparo, porções, ingredientes que já tenho, ingredientes que faltam comprar e o modo de preparo passo a passo.`
+Para cada receita, forneça: nome, imageQuery do prato, categoria, tempo de preparo, porções, calorias estimadas por porção, ingredientes que já tenho, ingredientes que faltam comprar e o modo de preparo passo a passo.`
 
   return {
     systemInstruction: {
@@ -795,6 +802,7 @@ function normalizeGeminiRecipe(recipe: Record<string, unknown>) {
 
   const readyInMinutes = Number(recipe.readyInMinutes ?? 0)
   const servings = Number(recipe.servings ?? 1)
+  const caloriesPerServing = Number(recipe.caloriesPerServing ?? 0)
   const title =
     typeof recipe.title === 'string' ? recipe.title : 'Receita sem nome'
 
@@ -811,6 +819,12 @@ function normalizeGeminiRecipe(recipe: Record<string, unknown>) {
     image: CATEGORY_IMAGES[category] ?? CATEGORY_IMAGES.outros,
     readyInMinutes,
     servings,
+    // Estimativa nutricional em kcal por porção. Zero indica que o modelo não
+    // informou o valor, e a interface simplesmente oculta o campo.
+    caloriesPerServing:
+      Number.isFinite(caloriesPerServing) && caloriesPerServing > 0
+        ? Math.min(Math.round(caloriesPerServing), 5000)
+        : 0,
     time: readyInMinutes > 0 ? `${readyInMinutes} min` : 'Tempo não informado',
     usedIngredients,
     missedIngredients,

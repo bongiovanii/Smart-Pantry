@@ -74,6 +74,7 @@ function normalizeRecipe(recipe) {
   const missedIngredientCount = Number(recipe.missedIngredientCount ?? 0)
   const readyInMinutes = Number(recipe.readyInMinutes ?? 0)
   const servings = Number(recipe.servings ?? 0)
+  const caloriesPerServing = Number(recipe.caloriesPerServing ?? 0)
 
   // Retornamos um novo objeto contendo todos os dados necessários para o app,
   // incluindo steps e servings que antes exigiam uma segunda chamada à API.
@@ -84,6 +85,10 @@ function normalizeRecipe(recipe) {
     category: recipe.category || 'outros',
     readyInMinutes,
     servings,
+    caloriesPerServing:
+      Number.isFinite(caloriesPerServing) && caloriesPerServing > 0
+        ? Math.round(caloriesPerServing)
+        : 0,
     time: readyInMinutes > 0 ? `${readyInMinutes} min` : 'Tempo não informado',
     usedIngredientCount,
     missedIngredientCount,
@@ -216,6 +221,7 @@ export async function getRecipeDetails(recipe) {
     image: recipe.image,
     readyInMinutes: recipe.readyInMinutes ?? 0,
     servings: recipe.servings ?? 0,
+    caloriesPerServing: recipe.caloriesPerServing ?? 0,
     steps: recipe.steps ?? [],
     usedIngredients: recipe.usedIngredients ?? [],
     missedIngredients: recipe.missedIngredients ?? [],

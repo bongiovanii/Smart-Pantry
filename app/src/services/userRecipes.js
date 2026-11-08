@@ -9,6 +9,7 @@ const cookedRecipeFields = [
   'category',
   'ready_in_minutes',
   'servings',
+  'calories_per_serving',
   'used_ingredients',
   'missed_ingredients',
   'steps',
@@ -35,6 +36,7 @@ function normalizeCookedRecipe(row) {
     category: row.category || 'outros',
     readyInMinutes: Number(row.ready_in_minutes ?? 0),
     servings: Number(row.servings ?? 0),
+    caloriesPerServing: Number(row.calories_per_serving ?? 0),
     time:
       Number(row.ready_in_minutes ?? 0) > 0
         ? `${Number(row.ready_in_minutes)} min`

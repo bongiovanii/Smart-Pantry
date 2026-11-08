@@ -330,6 +330,14 @@ function MyRecipesPage({ refreshToken, onGoToPantry, onOpenRecipe }) {
                       </span>
                       {recipe.time}
                     </span>
+                    {recipe.caloriesPerServing > 0 && (
+                      <span className="flex items-center gap-1">
+                        <span className="material-symbols-outlined text-base">
+                          local_fire_department
+                        </span>
+                        {recipe.caloriesPerServing} kcal
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-base">
                         history

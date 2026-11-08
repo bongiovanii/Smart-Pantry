@@ -31,6 +31,7 @@ function RecipeDetailModal({ isOpen, recipe, onClose, onCook }) {
   const steps = recipe.steps ?? []
   const readyInMinutes = recipe.readyInMinutes || 0
   const servings = recipe.servings || 0
+  const caloriesPerServing = recipe.caloriesPerServing || 0
 
   return (
     <div
@@ -103,6 +104,15 @@ function RecipeDetailModal({ isOpen, recipe, onClose, onCook }) {
               <span className="material-symbols-outlined text-base">schedule</span>
               {readyInMinutes > 0 ? `${readyInMinutes} minutos` : 'Tempo não informado'}
             </span>
+
+            {caloriesPerServing > 0 && (
+              <span className="flex items-center gap-1.5 rounded-full bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-800">
+                <span className="material-symbols-outlined text-base">
+                  local_fire_department
+                </span>
+                {caloriesPerServing} kcal por porção
+              </span>
+            )}
 
             {servings > 0 && (
               <span className="flex items-center gap-1.5 rounded-full bg-surface-container px-3 py-1.5 text-xs font-bold text-on-surface-variant">

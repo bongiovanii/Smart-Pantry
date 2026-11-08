@@ -1,4 +1,12 @@
-function FeatureCard({ title, time, ingredients, image, imageSource, onClick }) {
+function FeatureCard({
+  title,
+  time,
+  ingredients,
+  caloriesPerServing,
+  image,
+  imageSource,
+  onClick,
+}) {
   return (
     <article
       aria-label={`Ver detalhes da receita ${title}`}
@@ -22,6 +30,14 @@ function FeatureCard({ title, time, ingredients, image, imageSource, onClick }) 
         {imageSource === 'wikimedia-commons' && (
           <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur">
             Foto: Wikimedia Commons
+          </span>
+        )}
+        {caloriesPerServing > 0 && (
+          <span className="absolute bottom-2 right-2 flex items-center gap-0.5 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-primary shadow-sm backdrop-blur">
+            <span className="material-symbols-outlined text-sm">
+              local_fire_department
+            </span>
+            {caloriesPerServing} kcal
           </span>
         )}
         <button
