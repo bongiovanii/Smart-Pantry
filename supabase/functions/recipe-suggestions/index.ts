@@ -10,6 +10,22 @@ declare const Deno: {
 // Pode ser sobrescrito pelo secret GEMINI_MODEL sem precisar alterar o código.
 const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite'
 
+// Quando o modelo principal está sobrecarregado, a Google responde 429/5xx.
+// Tentamos modelos alternativos antes de devolver erro ao aplicativo.
+const DEFAULT_GEMINI_FALLBACK_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+]
+
+// Formato mínimo consumido da resposta do Gemini.
+type GeminiResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> }
+    finishReason?: string
+  }>
+  error?: { message?: string }
+}
+
 // Endpoint REST do Gemini (generateContent API v1beta — sem SDK, compatível com Deno).
 function buildGeminiEndpoint(model: string) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
@@ -18,7 +34,32 @@ function buildGeminiEndpoint(model: string) {
 // O Gemini pode responder 429/5xx em picos temporários de demanda.
 // Tentamos novamente com uma pequena espera antes de devolver erro ao app.
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504])
-const MAX_GEMINI_ATTEMPTS = 3
+// 404 também permite tentar outro modelo quando o nome não existe na conta.
+const MODEL_FALLBACK_STATUS = new Set([404, ...RETRYABLE_STATUS])
+const MAX_GEMINI_ATTEMPTS = 2
+
+// Monta a lista de modelos na ordem de preferência:
+// 1. GEMINI_MODEL (secret) ou o padrão;
+// 2. GEMINI_FALLBACK_MODELS (secret opcional, separado por vírgulas);
+// 3. fallbacks padrão do projeto.
+function getGeminiModels() {
+  const primary =
+    Deno.env.get('GEMINI_MODEL')?.trim() || DEFAULT_GEMINI_MODEL
+  const configuredFallbacks = (
+    Deno.env.get('GEMINI_FALLBACK_MODELS') ?? ''
+  )
+    .split(',')
+    .map((model) => model.trim())
+    .filter(Boolean)
+
+  return [
+    ...new Set([
+      primary,
+      ...configuredFallbacks,
+      ...DEFAULT_GEMINI_FALLBACK_MODELS,
+    ]),
+  ]
+}
 
 async function fetchGeminiWithRetry(
   model: string,
@@ -36,13 +77,22 @@ async function fetchGeminiWithRetry(
       body: JSON.stringify(payload),
     })
 
-    const data = await response.json()
+    let data: GeminiResponse | null = null
+
+    try {
+      data = (await response.json()) as GeminiResponse
+    } catch {
+      // Alguns erros de gateway vêm sem corpo JSON. O status ainda permite
+      // decidir entre repetir ou tentar outro modelo.
+      data = null
+    }
 
     if (!RETRYABLE_STATUS.has(response.status) || attempt === MAX_GEMINI_ATTEMPTS) {
       return { response, data }
     }
 
     console.warn('Gemini indisponível; tentando novamente.', {
+      model,
       status: response.status,
       attempt,
     })
@@ -785,7 +835,7 @@ Deno.serve(async (request) => {
 
   // A chave fica armazenada nos secrets do Supabase e nunca é exposta ao cliente.
   const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
-  const geminiModel = Deno.env.get('GEMINI_MODEL') || DEFAULT_GEMINI_MODEL
+  const geminiModels = getGeminiModels()
 
   if (!geminiApiKey) {
     console.error('GEMINI_API_KEY não foi configurada nos secrets do Supabase.')
@@ -813,24 +863,52 @@ Deno.serve(async (request) => {
     // Monta a requisição e chama o endpoint REST do Gemini.
     const geminiRequest = buildGeminiRequest(ingredients, limit)
 
-    // Lê a resposta do Gemini (com novas tentativas em falhas temporárias).
-    const { response: geminiResponse, data: geminiData } =
-      await fetchGeminiWithRetry(geminiModel, geminiApiKey, geminiRequest)
+    // Tenta o modelo principal e, em caso de sobrecarga ou indisponibilidade,
+    // tenta os modelos de fallback antes de devolver erro ao aplicativo.
+    let geminiResponse: Response | null = null
+    let geminiData: GeminiResponse | null = null
+    let geminiModel = geminiModels[0]
 
-    if (!geminiResponse.ok) {
-      const upstreamMessage =
-        geminiData?.error?.message ?? 'Erro não detalhado pelo Gemini.'
+    for (const model of geminiModels) {
+      geminiModel = model
+      const result = await fetchGeminiWithRetry(
+        model,
+        geminiApiKey,
+        geminiRequest,
+      )
+
+      geminiResponse = result.response
+      geminiData = result.data
+
+      if (geminiResponse.ok) break
 
       console.error('Erro retornado pela API do Gemini.', {
         status: geminiResponse.status,
-        model: geminiModel,
+        model,
         response: geminiData,
       })
 
-      // 429 = rate limit; 403 = chave inválida ou cota excedida.
-      if (geminiResponse.status === 429 || geminiResponse.status === 403) {
+      // Erros de requisição ou de credencial não melhoram ao trocar de modelo.
+      if (!MODEL_FALLBACK_STATUS.has(geminiResponse.status)) break
+    }
+
+    if (!geminiResponse?.ok) {
+      const upstreamStatus = geminiResponse?.status ?? 0
+      const upstreamMessage =
+        geminiData?.error?.message ?? 'Erro não detalhado pelo Gemini.'
+
+      console.error('Todas as tentativas de geração falharam.', {
+        models: geminiModels,
+        status: upstreamStatus,
+        response: geminiData,
+      })
+
+      if (MODEL_FALLBACK_STATUS.has(upstreamStatus)) {
         return jsonResponse(
-          { error: 'O serviço de receitas está temporariamente indisponível. Tente novamente em instantes.' },
+          {
+            error:
+              'O serviço de receitas está temporariamente sobrecarregado. Tente novamente em alguns instantes.',
+          },
           503,
         )
       }
@@ -838,12 +916,18 @@ Deno.serve(async (request) => {
       return jsonResponse(
         {
           error: 'Não foi possível gerar sugestões de receitas.',
-          upstreamStatus: geminiResponse.status,
+          upstreamStatus,
           // Ajuda a diagnosticar configuração/modelo sem expor a chave.
           detail: upstreamMessage,
         },
         502,
       )
+    }
+
+    if (geminiModel !== geminiModels[0]) {
+      console.warn('Modelo principal indisponível; fallback utilizado.', {
+        model: geminiModel,
+      })
     }
 
     // O Gemini retorna o JSON gerado dentro de candidates[0].content.parts[].text.

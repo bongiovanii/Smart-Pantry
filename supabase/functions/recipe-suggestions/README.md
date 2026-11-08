@@ -25,6 +25,42 @@ anteriormente foi desligado pela Google em 01/06/2026.
 Também é possível cadastrar os secrets pelo painel em **Edge Functions >
 Secrets**.
 
+## Sobrecarga do Gemini e fallback entre modelos
+
+Em picos de demanda a Google responde com erros temporários, por exemplo:
+
+```text
+This model is currently experiencing high demand. Spikes in demand are
+usually temporary. Please try again later.
+```
+
+Antes, esse caso era convertido em `HTTP 502` e o aplicativo exibia um erro
+genérico. Agora a função:
+
+1. repete a chamada até 2 vezes no mesmo modelo, com espera progressiva;
+2. se o erro persistir (`429`, `500`, `502`, `503`, `504` ou `404`), tenta os
+   modelos de fallback em sequência;
+3. se todos falharem por sobrecarga, responde `HTTP 503` com uma mensagem
+   amigável;
+4. só responde `502` para erros não temporários, como requisição inválida ou
+   configuração incorreta.
+
+A ordem de preferência é:
+
+1. `GEMINI_MODEL` (secret) ou `gemini-3.1-flash-lite`;
+2. `GEMINI_FALLBACK_MODELS` (secret opcional, separado por vírgulas);
+3. fallbacks padrão do código: `gemini-3.5-flash-lite` e `gemini-3.6-flash`.
+
+Para ajustar os fallbacks sem alterar o código:
+
+```powershell
+npx supabase secrets set GEMINI_FALLBACK_MODELS="gemini-3.5-flash-lite,gemini-3.6-flash"
+```
+
+O arquivo `index.ts` registra no log qual modelo respondeu e quando o fallback
+foi necessário. O frontend já trata o `503` como indisponibilidade temporária e
+permite nova tentativa.
+
 Para testes locais, copie `supabase/functions/.env.example` para
 `supabase/functions/.env`, preencha a chave e execute:
 

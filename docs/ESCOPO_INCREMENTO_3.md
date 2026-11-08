@@ -320,6 +320,34 @@ A função usa `security invoker`, `search_path = ''` e valida `auth.uid()`. O s
 
 O arquivo `docs/plano_implementaca_v2.md` foi renomeado para `docs/plano_implementacao_v2.md`, corrigindo o nome. O conteúdo foi preservado.
 
+### 6.6 Correção do erro 502 na geração de receitas
+
+Após o deploy, o aplicativo passou a exibir `Failed to load resource: .../functions/v1/recipe-suggestions ... status of 502` ao gerar receitas.
+
+**Causa:** a Edge Function chamava apenas o modelo principal (`gemini-3.1-flash-lite`) uma vez. Em picos de demanda, o Gemini respondia:
+
+```text
+This model is currently experiencing high demand. Spikes in demand are
+usually temporary. Please try again later.
+```
+
+O código tratava esse erro temporário como falha definitiva e devolvia `HTTP 502` ao frontend.
+
+**Correção aplicada em `supabase/functions/recipe-suggestions/index.ts`:**
+
+| Item | Antes | Depois |
+|---|---|---|
+| Modelos | Apenas `GEMINI_MODEL` | Principal + lista de fallback |
+| Tentativas por modelo | 1 | 2, com espera progressiva |
+| Fallback | Não existia | `gemini-3.5-flash-lite` e `gemini-3.6-flash` |
+| Sobrecarga persistente | `502` genérico | `503` com mensagem amigável |
+| Modelo configurável | `GEMINI_MODEL` | `GEMINI_MODEL` e `GEMINI_FALLBACK_MODELS` |
+| Diagnóstico | Sem registro do modelo | Log com modelo usado e fallback acionado |
+
+A ordem de modelos é: `GEMINI_MODEL` (ou o padrão), `GEMINI_FALLBACK_MODELS` (secret opcional) e os fallbacks padrão do código. Erros temporários (`429`, `500`, `502`, `503`, `504`) e modelo inexistente (`404`) acionam o próximo modelo. Erros de requisição ou credencial continuam interrompendo o fluxo.
+
+O frontend já exibe a mensagem retornada pela função, então o `503` chega ao usuário como “O serviço de receitas está temporariamente sobrecarregado. Tente novamente em alguns instantes.” em vez de um erro de rede genérico.
+
 ---
 
 ## 7. Fluxos detalhados
@@ -536,7 +564,32 @@ O `App` foi separado em um chunk próprio para manter a landing page mais leve.
 - O teste foi repetido em viewport desktop e mobile.
 - Nenhum erro de console ou de página foi registrado.
 
-### 10.4 Checklist de aceite
+### 10.4 Teste da correção do 502
+
+Reprodução antes da correção, com seis ingredientes:
+
+```text
+HTTP 502 em 9s
+receitas: 0
+detalhe: This model is currently experiencing high demand. Spikes in demand
+are usually temporary. Please try again later.
+```
+
+Após o deploy da versão com fallback, a mesma requisição retornou:
+
+```text
+HTTP 200 em 14s
+receitas: 6
+titulos: Arroz de Frango Caseiro, Frango Desfiado com Molho Rústico,
+Prato Feito Brasileiro com Vinagrete, Caldo de Feijão Caseiro com Frango,
+Salada de Frango com Tomate e Cebola, Farofa Rica de Feijao e Frango
+```
+
+A chamada foi feita diretamente na Edge Function com a chave publicável e o
+mesmo corpo `{"ingredients":["arroz","feijão","frango","tomate","cebola","alho"],"limit":6}`
+usado pelo aplicativo.
+
+### 10.5 Checklist de aceite
 
 - [x] Landing page pública implementada.
 - [x] Tela de login e cadastro com Google implementada.
@@ -554,6 +607,10 @@ O `App` foi separado em um chunk próprio para manter a landing page mais leve.
 - [x] Deploy na Vercel publicado.
 - [x] ESLint e build aprovados.
 - [x] Fluxo de login validado em navegador real.
+- [x] Erro 502 do Gemini reproduzido e diagnosticado.
+- [x] Fallback entre modelos e resposta 503 implementados.
+- [x] Função atualizada publicada no Supabase.
+- [x] Requisição de seis receitas validada com HTTP 200.
 
 ---
 
@@ -594,6 +651,11 @@ O `App` foi separado em um chunk próprio para manter a landing page mais leve.
 10. **Consentimento Google**
     - Enquanto o app estiver em modo de teste no Google Cloud, apenas usuários de teste conseguem entrar.
     - Para uso amplo, a tela de consentimento precisa ser publicada.
+
+11. **Disponibilidade do Gemini**
+    - A geração depende da cota e da capacidade da Google.
+    - O fallback entre modelos reduz a falha, mas não elimina indisponibilidade total.
+    - Nesse caso, o usuário recebe `503` com mensagem para tentar novamente.
 
 ---
 
@@ -655,6 +717,8 @@ O `App` foi separado em um chunk próprio para manter a landing page mais leve.
 | `supabase/.env.example` | Credenciais locais do Google |
 | `supabase/migrations/20261108120000_stock_movements_consumption.sql` | Movimentações de consumo |
 | `supabase/migrations/20261108160000_user_recipes.sql` | Histórico de receitas e nova RPC |
+| `supabase/functions/recipe-suggestions/index.ts` | Fallback entre modelos Gemini e resposta 503 em sobrecarga |
+| `supabase/functions/recipe-suggestions/README.md` | Documentação do fallback e dos secrets |
 | `docs/ESTADO_ATUAL_DO_PROJETO.md` | Atualização do estado atual |
 | `docs/plano_implementacao_v2.md` | Renomeação do plano |
 | `docs/ESCOPO_INCREMENTO_3.md` | Este documento |
