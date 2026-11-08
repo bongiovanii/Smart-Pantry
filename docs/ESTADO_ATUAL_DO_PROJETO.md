@@ -1,7 +1,10 @@
 # Smart Pantry — Estado atual do projeto
 
-**Data de atualização:** 08 de novembro de 2026  
+**Data de atualização:** 08 de novembro de 2026
+
 **Fase atual:** base técnica concluída, CRUD da despensa, integração de receitas com IA, registro de consumo de receitas (Fase 3), histórico “Minhas receitas” por usuário e autenticação com Google implementados.
+
+**Incremento documentado:** [`ESCOPO_INCREMENTO_3.md`](./ESCOPO_INCREMENTO_3.md) — histórico de receitas, autenticação Google e deploy público.
 
 ## 1. Finalidade deste documento
 
