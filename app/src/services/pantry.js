@@ -1,49 +1,8 @@
-import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
+import { getCurrentSession } from '../lib/session.js'
+import { supabase } from '../lib/supabase.js'
 
 const pantryFields =
   'id, name, category, quantity, unit, expiration_date, created_at, updated_at'
-
-let sessionPromise
-
-function requireSupabase() {
-  if (!isSupabaseConfigured || !supabase) {
-    throw new Error(
-      'Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no arquivo app/.env.local e reinicie o servidor.',
-    )
-  }
-}
-
-async function resolveSession() {
-  requireSupabase()
-
-  const { data, error } = await supabase.auth.getSession()
-
-  if (error) throw error
-  if (data.session) return data.session
-
-  const { data: anonymousData, error: anonymousError } =
-    await supabase.auth.signInAnonymously()
-
-  if (anonymousError) {
-    throw new Error(
-      'Não foi possível iniciar a sessão. Confirme se o login anônimo está habilitado no Supabase.',
-      { cause: anonymousError },
-    )
-  }
-
-  return anonymousData.session
-}
-
-function getCurrentSession() {
-  if (!sessionPromise) {
-    sessionPromise = resolveSession().catch((error) => {
-      sessionPromise = undefined
-      throw error
-    })
-  }
-
-  return sessionPromise
-}
 
 export async function listPantryItems() {
   await getCurrentSession()
@@ -118,4 +77,3 @@ export async function archivePantryItem(id) {
 
   return data
 }
-

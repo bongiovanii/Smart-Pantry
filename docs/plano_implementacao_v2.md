@@ -106,9 +106,12 @@ Vincular a decisão de cozinhar à gestão real de despensa: ao fazer uma receit
    - Após confirmação, os registros correspondentes são gravados em `stock_movements`, feedback de sucesso é exibido e a despensa é atualizada automaticamente.
 
 ### 3.3 Critérios de Pronto
-- [ ] Confirmação de receita gera registros auditáveis em `stock_movements`.
-- [ ] Itens consumidos saem da contagem ativa de "Em estoque agora" (ou ganham etiqueta visual).
-- [ ] Base de dados passa a acumular dados reais para a medição de desperdício do TCC.
+- [x] Confirmação de receita gera registros auditáveis em `stock_movements`.
+- [x] Itens consumidos saem da contagem ativa de "Em estoque agora" (ou ganham etiqueta visual).
+- [x] Base de dados passa a acumular dados reais para a medição de desperdício do TCC.
+
+> [!NOTE]
+> **Migração aplicada:** o arquivo [`20261108120000_stock_movements_consumption.sql`](file:///home/gustavo-bongiovani/Documentos/GitHub/Smart-Pantry/supabase/migrations/20261108120000_stock_movements_consumption.sql) foi aplicado no projeto `cojcrquveckvrdzjivmc` em 08/11/2026 via `npx supabase db push --remote cojcrquveckvrdzjivmc --yes`. Ele adiciona a coluna `status` e a função transacional `consume_recipe_ingredients`. Para outro ambiente, aplique a migração antes de usar o botão **Confirmar consumo**.
 
 ---
 

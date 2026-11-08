@@ -1,7 +1,7 @@
 # Smart Pantry — Estado atual do projeto
 
-**Data de atualização:** 14 de outubro de 2026  
-**Fase atual:** base técnica concluída, cadastro da despensa implementado e primeira integração de receitas em funcionamento.
+**Data de atualização:** 08 de novembro de 2026  
+**Fase atual:** base técnica concluída, CRUD da despensa, integração de receitas com IA, registro de consumo de receitas (Fase 3), histórico “Minhas receitas” por usuário e autenticação com Google implementados.
 
 ## 1. Finalidade deste documento
 
@@ -49,7 +49,7 @@ Interface React responsiva (Vite)
 - **Backend:** Node.js (ecossistema de execução, dependências e tooling) e Supabase Edge Functions (Deno/TypeScript) para isolamento de regras de integração e segurança.
 - **Interface (Frontend):** React com Vite, estruturado em componentes com foco mobile-first.
 - **Banco de Dados (DB):** Supabase (PostgreSQL relacional com Row Level Security - RLS).
-- **Autenticação:** Supabase Auth. *Situação atual:* opera com sessão anônima (`anon`) para viabilizar testes rápidos sem atrito. *Necessidade identificada:* configurar a autenticação formal no Supabase (e-mail/senha ou provedores sociais) para permitir persistência de conta entre múltiplos dispositivos e recuperação de acesso.
+- **Autenticação:** Supabase Auth com OAuth do Google (PKCE). A aplicação exibe uma landing page pública e só libera a despensa após o login. A criação automática de usuários anônimos foi removida.
 - **Geração / Consulta de Receitas:** Gemini API (Google AI Studio) integrada via Supabase Edge Function com Structured Output (JSON Schema). Receitas geradas 100% em português do Brasil (PT-BR) com ingredientes, passos de preparo e metadados entregues em uma única requisição. Motor anterior (Spoonacular) removido.
 
 ### Interface da aplicação
@@ -62,7 +62,9 @@ A interface segue a abordagem mobile-first. Em telas pequenas, a navegação é 
 
 Os componentes visuais não acessam diretamente o banco de dados nem a API externa. Essa comunicação foi concentrada em serviços próprios:
 
-- `pantry.js`: inicia ou reutiliza a sessão do usuário, consulta a despensa e cadastra ingredientes;
+- `pantry.js`: exige sessão autenticada, consulta a despensa e cadastra ingredientes;
+- `auth.js`: centraliza leitura de sessão, login Google, logout e dados do perfil;
+- `session.js`: garante que nenhuma operação seja executada sem usuário autenticado;
 - `recipe.js`: prepara os ingredientes, chama a função de receitas e converte a resposta para o formato utilizado pelos cartões da interface;
 - `supabase.js`: cria e disponibiliza a conexão central com o projeto Supabase.
 
@@ -72,11 +74,11 @@ Essa separação facilita a manutenção e evita que regras de integração fiqu
 
 O Supabase exerce três funções principais no projeto:
 
-1. identificar o usuário por meio de uma sessão anônima;
+1. identificar o usuário por meio da sessão autenticada do Google;
 2. armazenar os dados da despensa em um banco PostgreSQL;
 3. executar a Edge Function responsável pela integração com o Gemini API.
 
-A sessão anônima permite separar os dados de cada usuário sem exigir um cadastro tradicional nesta primeira versão. Essa escolha simplifica o acesso ao MVP, mas ainda permite aplicar regras de segurança por usuário.
+A sessão autenticada fornece o identificador único utilizado no cadastro e na consulta dos itens. Com isso, cada usuário visualiza somente a própria despensa, e os dados permanecem disponíveis entre dispositivos ao entrar com a mesma conta Google.
 
 ## 5. Capacidades implementadas
 
@@ -95,11 +97,11 @@ Já estão presentes na interface:
 
 O planejamento semanal permanece demonstrativo e ainda não possui persistência ou regras de negócio.
 
-### 5.2 Sessão de usuário
+### 5.2 Autenticação e sessão de usuário
 
-Ao acessar a aplicação, o serviço da despensa verifica se já existe uma sessão Supabase. Quando não existe, o sistema solicita uma sessão anônima.
+A aplicação abre em uma landing page pública. Os botões **Entrar** e **Criar conta** levam à tela de login, que oferece autenticação com a conta Google por meio do Supabase Auth. Depois do retorno do Google, a sessão é detectada na URL, persistida no navegador e o aplicativo é liberado.
 
-Essa sessão fornece um identificador único utilizado no cadastro e na consulta dos itens. Com isso, cada usuário visualiza somente a própria despensa.
+Não existe mais criação automática de sessão anônima. Os serviços exigem uma sessão autenticada antes de consultar a despensa, as receitas ou o histórico. Ao sair, a sessão é encerrada e o usuário volta à landing page. O cabeçalho e o menu lateral exibem nome, e-mail e avatar do Google.
 
 ### 5.3 Cadastro manual de ingredientes
 
@@ -134,8 +136,8 @@ O modelo inicial possui duas tabelas:
 
 | Tabela | Papel atual |
 |---|---|
-| `pantry_items` | Armazena os ingredientes, quantidades, unidades, validade e vínculo com o usuário. Já participa do funcionamento da aplicação. |
-| `stock_movements` | Estrutura preparada para registrar entradas, consumo, desperdício, ajustes e estornos. Ainda não está ligada à interface. |
+| `pantry_items` | Armazena os ingredientes, quantidades, unidades, validade, status e vínculo com o usuário. Já participa do funcionamento da aplicação. |
+| `stock_movements` | Registra entradas, consumo, desperdício, ajustes e estornos. Passou a receber os consumos confirmados a partir das receitas. |
 
 A tabela de movimentações será importante para formar um histórico e medir consumo ou desperdício. Por enquanto, ela representa uma capacidade estrutural do banco, não uma funcionalidade entregue ao usuário.
 
@@ -191,19 +193,55 @@ A seção de receitas diferencia os seguintes estados:
 
 Também existe uma proteção contra a repetição da mesma requisição, reduzindo chamadas desnecessárias ao Gemini e preservando a cota do serviço.
 
+### 5.11 Consumo de receitas e movimentações de estoque
+
+O botão **Cozinhar esta receita**, no modal de detalhes, abre uma confirmação de consumo. O sistema relaciona os ingredientes indicados pela receita aos itens reais da despensa por nome normalizado (sem diferença de acentos, maiúsculas ou plural) e permite, para cada item:
+
+- **Consumo total:** zera o saldo, define `status = 'consumido'` e arquiva o item, retirando-o da contagem ativa;
+- **Consumo parcial:** debita apenas a quantidade utilizada e mantém o saldo restante ativo na despensa;
+- **Exclusão da lista:** o item pode ser desmarcado e não entra no registro.
+
+A gravação ocorre em uma única transação no banco, por meio da função `consume_recipe_ingredients`. Ela valida o saldo, insere a linha correspondente em `stock_movements` com `movement_type = 'consumption'` e o motivo `Preparo da receita: <título>`, atualiza `pantry_items` e registra o snapshot da receita em `user_recipes`. Após a confirmação, a interface reflete o novo saldo sem recarregar a página e exibe um aviso de sucesso.
+
+### 5.12 Minhas receitas (histórico por usuário)
+
+A navegação lateral passou a exibir **Minhas receitas** no lugar do antigo atalho de receitas. A nova tela funciona como um inventário do histórico culinário do usuário:
+
+- cada execução confirmada gera uma linha em `user_recipes`, com `user_id`, snapshot da receita, ingredientes usados/faltantes, passos, imagem e `cooked_at`;
+- o inventário agrupa execuções da mesma receita e mostra quantas vezes ela foi preparada e a data do último preparo;
+- uma linha do tempo lista os preparos individuais mais recentes;
+- a busca filtra o inventário por nome ou categoria;
+- clicar em um card ou registro abre o modal de detalhes já com os dados salvos, sem nova chamada ao Gemini.
+
+A tabela usa RLS por `user_id`, de modo que cada sessão lê e registra apenas as próprias receitas. Como o snapshot é gravado na mesma transação do consumo, não existe caso de receita contabilizada sem baixa no estoque nem de consumo sem entrada no histórico.
+
 ## 6. Organização atual dos principais componentes
 
 | Elemento | Responsabilidade no sistema |
 |---|---|
-| `App.jsx` | Compõe a tela principal e coordena o carregamento da despensa e das receitas. |
+| `Root.jsx` | Resolve a sessão inicial e controla o fluxo landing → login → aplicativo. |
+| `LandingPage.jsx` | Apresenta a proposta do produto e direciona para login ou criação de conta. |
+| `LoginScreen.jsx` | Oferece o login/cadastro com Google e trata carregamento e erros do OAuth. |
+| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa e “Minhas receitas” e coordena o registro de consumo. |
+| `MyRecipesPage.jsx` | Exibe o inventário, a busca e a linha do tempo das receitas executadas pelo usuário. |
 | `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente. |
+| `RecipeDetailModal.jsx` | Exibe ingredientes, tempo, porções e modo de preparo da receita. |
+| `CookRecipeModal.jsx` | Confirma quais itens da despensa serão consumidos e em que quantidade. |
 | `FeatureCard.jsx` | Apresenta visualmente uma receita. |
-| `AppHeader.jsx` | Apresenta o cabeçalho principal. |
+| `AppHeader.jsx` | Apresenta o cabeçalho, o avatar e o menu da conta com logout. |
+| `UserAvatar.jsx` | Exibe o avatar do Google com fallback para a inicial do nome. |
 | `pantry.js` | Executa os casos de consulta e cadastro da despensa. |
+| `movements.js` | Registra o consumo dos ingredientes e o snapshot da receita via RPC transacional. |
+| `userRecipes.js` | Consulta o histórico de receitas do usuário e normaliza os snapshots salvos. |
 | `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas. |
-| `supabase.js` | Centraliza a criação do cliente Supabase. |
+| `supabase.js` | Centraliza a criação do cliente Supabase com persistência e PKCE. |
+| `auth.js` | Centraliza login Google, logout, sessão e dados do perfil. |
+| `session.js` | Exige sessão autenticada antes de qualquer operação nos serviços. |
+| `ingredientMatch.js` | Relaciona os nomes de ingredientes das receitas aos itens da despensa. |
 | `recipe-suggestions/index.ts` | Protege a chave do Gemini, gera receitas em PT-BR via Structured Output e mapeia imagens por categoria. |
 | Migração inicial | Cria tabelas, relacionamentos, validações, índices e políticas de segurança. |
+| Migração da Fase 3 | Adiciona `status` a `pantry_items` e a função transacional de consumo. |
+| Migração do histórico | Cria `user_recipes` com RLS e amplia a RPC para gravar o snapshot da receita na mesma transação. |
 
 ## 7. Decisões de engenharia já adotadas
 
@@ -223,9 +261,9 @@ O acesso ao Supabase e à API de receitas foi retirado dos componentes visuais. 
 
 O frontend contém apenas dados publicáveis necessários ao cliente Supabase. A chave da Spoonacular é armazenada como segredo da Edge Function e não é enviada ao navegador.
 
-### Transição de autenticação anônima para autenticação completa
+### Transição da autenticação anônima para o login com Google
 
-A autenticação anônima do Supabase Auth serviu como viabilizador para o MVP sem atrito de cadastro. Contudo, para o uso persistente entre múltiplos dispositivos e recuperação segura de conta, a configuração de autenticação formal (e-mail/senha ou OAuth) no Supabase é uma necessidade prioritária já planejada na arquitetura.
+A autenticação anônima do Supabase Auth serviu como viabilizador do MVP sem atrito de cadastro, mas não permitia acesso entre dispositivos nem recuperação de conta. Como os dados existentes eram apenas de teste, optou-se por substituir o fluxo anônimo pelo OAuth do Google sem migração de dados. O frontend configura o cliente Supabase com persistência de sessão, renovação automática de token, detecção da sessão na URL e fluxo PKCE.
 
 ### Decisão de Engenharia: Substituição da Spoonacular por IA Generativa (Google AI Studio / Gemini API)
 
@@ -255,15 +293,16 @@ Essa distinção será usada quando os requisitos forem revisados.
 | Ambiente Backend / Node.js | Implementado | Runtime para build, tooling de desenvolvimento e funções serveless. |
 | Interface React/Vite | Implementada | Aplicação executável e com build de produção (mobile-first). |
 | Banco de dados Supabase (PostgreSQL) | Implementado | Armazenamento relacional e políticas de acesso (RLS). |
-| Autenticação anônima | Implementada | Identifica e separa a despensa do usuário localmente. |
-| Autenticação completa (Supabase Auth) | Planejada / Em configuração | Necessária para suporte a login multi-dispositivo e persistência definitiva. |
+| Autenticação com Google | Implementada | Landing page pública, login via OAuth do Google, sessão persistida e logout. |
+| Perfil do usuário | Implementado | Nome, e-mail e avatar do Google no cabeçalho e no menu lateral. |
 | Gestão da despensa (CRUD) | Implementada | Cadastro, edição e exclusão suave (arquivamento) com validação e atualização reativa. |
 | Listagem da despensa | Implementada | Inclui carregamento, vazio e erro. |
 | Segurança RLS | Implementada no banco | Políticas vinculadas ao usuário. |
 | Sugestão de receitas (Gemini / Google AI Studio) | Implementada | Geração via Edge Function + Structured Output em PT-BR nativo. |
 | Detalhamento de receitas (Gemini) | Implementado | Modal com tempo, porções, ingredientes faltantes/em estoque e modo de preparo passo a passo — dados embutidos na primeira resposta, sem segunda requisição. |
 | Geração de receitas por IA (Open Source / Google AI Studio) | Implementada (Gemini) | Motor migrado do Spoonacular para o Gemini 2.0 Flash com PT-BR nativo. |
-| Movimentação de estoque | Estruturada no banco | Ainda não existe fluxo na interface. |
+| Movimentação de estoque | Implementada (consumo) | Consumo total/parcial de receitas grava em `stock_movements` e atualiza a despensa de forma transacional. |
+| Histórico “Minhas receitas” | Implementado | Tabela `user_recipes` com RLS, inventário agrupado, busca e linha do tempo por usuário. |
 | Alertas de validade | Planejados | Ainda não existe regra ativa ou central de alertas. |
 | Planejamento semanal | Demonstrativo | Interface sem persistência. |
 | Código de barras/Open Food Facts | Fora do escopo atual | Previsto para evolução futura. |
@@ -272,12 +311,13 @@ Essa distinção será usada quando os requisitos forem revisados.
 
 ## 9. Limitações conhecidas
 
-- A quantidade do ingrediente ainda não é atualizada automaticamente por consumo ou entrada de estoque.
-- A tabela `stock_movements` ainda não recebe registros da aplicação.
+- A quantidade é atualizada automaticamente pelo consumo de receitas; ainda não existe fluxo de entrada, descarte ou ajuste manual.
+- A tabela `stock_movements` recebe os consumos de receitas, mas ainda não possui tela própria de histórico; o histórico visível hoje é o de receitas executadas.
 - Ainda não é possível registrar um descarte e seu motivo.
 - Os alertas de validade não foram implementados.
 - O planejamento semanal ainda é uma representação visual.
-- A autenticação anônima atual impede que o usuário acesse seus dados a partir de outro dispositivo ou recupere a conta caso limpe o navegador. É necessário configurar a autenticação completa no Supabase.
+- A configuração do provider Google no Supabase ainda depende do Client ID e do Client Secret gerados no Google Cloud Console.
+- O login com Google exige que a URL de produção seja adicionada às origens autorizadas e às Redirect URLs do Supabase após o deploy.
 - O botão para descobrir mais receitas e a ação de favoritar ainda não possuem fluxo completo.
 - Não existe experiência offline nem instalação como PWA nesta etapa.
 - Ainda será necessário ampliar a estratégia de testes automatizados e de observação de falhas.
@@ -288,7 +328,8 @@ Durante a implementação foram realizados os seguintes controles:
 
 - execução do ESLint sem erros;
 - geração do build de produção pelo Vite;
-- verificação do carregamento da aplicação local;
+- verificação do carregamento da aplicação local (landing page pública);
+- implementação do gate de autenticação: nenhuma chamada à despensa ocorre sem sessão;
 - confirmação de cadastro, consulta, edição e exclusão suave (arquivamento) de ingredientes no Supabase;
 - confirmação visual e reativa da despensa com diálogo de confirmação para exclusão;
 - verificação dos estados de carregamento, erro e lista vazia;
@@ -296,7 +337,14 @@ Durante a implementação foram realizados os seguintes controles:
 - verificação do modal de detalhes com instruções passo a passo em PT-BR, tempo, porções e ingredientes faltantes vs em estoque;
 - confirmação de receitas geradas 100% em português do Brasil (PT-BR nativo via Gemini);
 - confirmação do carregamento instantâneo do modal (dados embutidos na primeira resposta);
-- publicação da versão atualizada da função `recipe-suggestions` com motor Gemini.
+- publicação da versão atualizada da função `recipe-suggestions` com motor Gemini;
+- execução do ESLint e do build do Vite após a implementação da Fase 3, sem erros;
+- teste unitário manual da correspondência de nomes (acentos, maiúsculas e plural) usada no consumo de receitas;
+- execução do ESLint e do build do Vite após a implementação de “Minhas receitas”, sem erros;
+- verificação da tabela `user_recipes` e da nova assinatura da RPC de consumo por meio de sessão autenticada.
+
+> [!NOTE]
+> As migrações `20261108120000_stock_movements_consumption.sql` e `20261108160000_user_recipes.sql` foram aplicadas no projeto Supabase remoto em 08/11/2026. Smoke tests confirmaram que a função e a tabela respondem às validações via RLS para usuários autenticados.
 
 Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas não substituem a avaliação com usuários nem a medição de redução do desperdício.
 
@@ -304,9 +352,9 @@ Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas
 
 A sequência deverá ser escolhida conforme o backlog e o tempo do projeto. A evolução mais coerente a partir da base atual inclui:
 
-1. registrar entrada, consumo, ajuste e descarte em `stock_movements`;
-2. atualizar a quantidade a partir das movimentações;
-3. configurar autenticação completa no Supabase (e-mail/senha ou OAuth) para permitir login seguro e multi-dispositivo;
+1. completar o registro de entrada, ajuste e descarte em `stock_movements`;
+2. criar a tela de histórico de movimentações e consolidar o saldo a partir delas;
+3. configurar o provider Google no Supabase e validar o login em produção;
 4. criar alertas derivados da data de validade;
 5. transformar o planejamento semanal em uma funcionalidade persistente;
 6. preparar dados para medir consumo e desperdício;

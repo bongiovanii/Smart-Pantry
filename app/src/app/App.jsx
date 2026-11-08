@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader.jsx'
+import CookRecipeModal from '../components/CookRecipeModal.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
 import RecipeDetailModal from '../components/RecipeDetailModal.jsx'
+import UserAvatar from '../components/UserAvatar.jsx'
+import MyRecipesPage from './MyRecipesPage.jsx'
+import { getUserEmail, getUserName } from '../lib/auth.js'
+import { formatQuantity } from '../lib/format.js'
+import { consumeRecipeIngredients } from '../services/movements.js'
 import {
   archivePantryItem,
   createPantryItem,
@@ -22,47 +28,104 @@ const week = [
   { day: 'DOM' },
 ]
 
-const unitLabels = {
-  un: 'un',
-  g: 'g',
-  kg: 'kg',
-  ml: 'ml',
-  l: 'l',
-  pacote: 'pacote',
-  caixa: 'caixa',
-  lata: 'lata',
+const sidebarItems = [
+  {
+    id: 'despensa',
+    label: 'Minha despensa',
+    icon: 'kitchen',
+    view: 'despensa',
+    section: 'despensa',
+  },
+  {
+    id: 'receitas',
+    label: 'Minhas receitas',
+    icon: 'menu_book',
+    view: 'minhas-receitas',
+  },
+  {
+    id: 'planejamento',
+    label: 'Planejamento',
+    icon: 'calendar_month',
+    view: 'despensa',
+    section: 'planejamento',
+  },
+  {
+    id: 'configuracoes',
+    label: 'Configurações',
+    icon: 'settings',
+    view: 'despensa',
+    section: 'configuracoes',
+  },
+]
+
+const mobileItems = [
+  {
+    id: 'despensa',
+    label: 'Despensa',
+    icon: 'kitchen',
+    view: 'despensa',
+    section: 'despensa',
+  },
+  {
+    id: 'receitas',
+    label: 'Receitas',
+    icon: 'menu_book',
+    view: 'minhas-receitas',
+  },
+  {
+    id: 'planejamento',
+    label: 'Planejar',
+    icon: 'calendar_month',
+    view: 'despensa',
+    section: 'planejamento',
+  },
+  {
+    id: 'configuracoes',
+    label: 'Ajustes',
+    icon: 'settings',
+    view: 'despensa',
+    section: 'configuracoes',
+  },
+]
+
+function isNavItemActive(item, activeView) {
+  if (item.view === 'minhas-receitas') return activeView === 'minhas-receitas'
+  return item.id === 'despensa' && activeView === 'despensa'
 }
 
-function Sidebar({ onNewIngredient }) {
+function Sidebar({ activeView, onNavigate, onNewIngredient, user }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-outline-variant bg-white p-6 lg:flex">
       <div className="mb-10 flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-full bg-secondary-container text-primary">
-          <span className="material-symbols-outlined">person</span>
-        </div>
+        <UserAvatar
+          className="h-11 w-11"
+          textClassName="text-lg"
+          user={user}
+        />
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-primary">Gerente de cozinha</p>
-          <p className="truncate text-xs text-on-surface-variant">Minha casa</p>
+          <p className="truncate text-sm font-bold text-primary">
+            {getUserName(user)}
+          </p>
+          <p className="truncate text-xs text-on-surface-variant">
+            {getUserEmail(user)}
+          </p>
         </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-2" aria-label="Navegação principal">
-        <a className="side-link side-link-active" href="#despensa">
-          <span className="material-symbols-outlined">kitchen</span>
-          Minha despensa
-        </a>
-        <a className="side-link" href="#receitas">
-          <span className="material-symbols-outlined">restaurant_menu</span>
-          Receitas
-        </a>
-        <a className="side-link" href="#planejamento">
-          <span className="material-symbols-outlined">calendar_month</span>
-          Planejamento
-        </a>
-        <a className="side-link" href="#configuracoes">
-          <span className="material-symbols-outlined">settings</span>
-          Configurações
-        </a>
+        {sidebarItems.map((item) => (
+          <button
+            className={`side-link w-full text-left ${
+              isNavItemActive(item, activeView) ? 'side-link-active' : ''
+            }`}
+            key={item.id}
+            onClick={() => onNavigate(item.view, item.section)}
+            type="button"
+          >
+            <span className="material-symbols-outlined">{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
       </nav>
 
       <button
@@ -77,34 +140,24 @@ function Sidebar({ onNewIngredient }) {
   )
 }
 
-function MobileNavigation() {
+function MobileNavigation({ activeView, onNavigate }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-outline-variant bg-white px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_18px_rgba(25,28,27,0.08)] lg:hidden">
-      <a className="mobile-nav-item mobile-nav-active" href="#despensa">
-        <span className="material-symbols-outlined">kitchen</span>
-        <span>Despensa</span>
-      </a>
-      <a className="mobile-nav-item" href="#receitas">
-        <span className="material-symbols-outlined">restaurant_menu</span>
-        <span>Receitas</span>
-      </a>
-      <a className="mobile-nav-item" href="#planejamento">
-        <span className="material-symbols-outlined">calendar_month</span>
-        <span>Planejar</span>
-      </a>
-      <a className="mobile-nav-item" href="#configuracoes">
-        <span className="material-symbols-outlined">settings</span>
-        <span>Ajustes</span>
-      </a>
+      {mobileItems.map((item) => (
+        <button
+          className={`mobile-nav-item ${
+            isNavItemActive(item, activeView) ? 'mobile-nav-active' : ''
+          }`}
+          key={item.id}
+          onClick={() => onNavigate(item.view, item.section)}
+          type="button"
+        >
+          <span className="material-symbols-outlined">{item.icon}</span>
+          <span>{item.label}</span>
+        </button>
+      ))}
     </nav>
   )
-}
-
-function formatQuantity(quantity, unit) {
-  const value = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(
-    Number(quantity),
-  )
-  return `${value} ${unitLabels[unit] || unit}`
 }
 
 function formatExpiration(date) {
@@ -115,10 +168,12 @@ function formatExpiration(date) {
   )}`
 }
 
-function App() {
+function App({ user, onSignOut }) {
   const [ingredients, setIngredients] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [activeView, setActiveView] = useState('despensa')
+  const [cookedRecipesVersion, setCookedRecipesVersion] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [deletingItem, setDeletingItem] = useState(null)
@@ -129,6 +184,10 @@ function App() {
   const [isRecipesLoading, setIsRecipesLoading] = useState(false)
   const [recipeError, setRecipeError] = useState('')
   const lastRecipeRequest = useRef('')
+  const [cookRecipe, setCookRecipe] = useState(null)
+  const [isConsuming, setIsConsuming] = useState(false)
+  const [consumeError, setConsumeError] = useState('')
+  const [notice, setNotice] = useState('')
 
   async function loadIngredients() {
     setIsLoading(true)
@@ -216,6 +275,14 @@ function App() {
       })
   }, [ingredients])
 
+  // Remove o aviso de sucesso automaticamente, sem exigir ação do usuário.
+  useEffect(() => {
+    if (!notice) return undefined
+
+    const timer = setTimeout(() => setNotice(''), 7000)
+    return () => clearTimeout(timer)
+  }, [notice])
+
   function openNewModal() {
     setEditingItem(null)
     setIsModalOpen(true)
@@ -263,14 +330,91 @@ function App() {
     }
   }
 
+  function handleNavigate(view, sectionId) {
+    setActiveView(view)
+
+    // Aguarda a troca de tela antes de posicionar a rolagem.
+    window.setTimeout(() => {
+      if (sectionId && view === 'despensa') {
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }, 0)
+  }
+
+  function handleCookRecipe(recipe) {
+    setSelectedRecipe(null)
+    setConsumeError('')
+    setCookRecipe(recipe)
+  }
+
+  async function handleConfirmCook(items) {
+    if (!cookRecipe || items.length === 0) return
+
+    setIsConsuming(true)
+    setConsumeError('')
+
+    try {
+      const updatedItems = await consumeRecipeIngredients({
+        recipe: cookRecipe,
+        recipeId: cookRecipe.id,
+        recipeTitle: cookRecipe.title,
+        items,
+      })
+
+      // A RPC devolve as linhas já atualizadas. Aplicamos no estado local para
+      // refletir o novo saldo sem precisar recarregar toda a despensa.
+      const updatedById = new Map(
+        updatedItems.map((item) => [item.id, item]),
+      )
+
+      setIngredients((current) =>
+        current
+          .map((item) => updatedById.get(item.id) ?? item)
+          .filter(
+            (item) => Number(item.quantity) > 0 && !item.archived_at,
+          ),
+      )
+
+      const recipeTitle = cookRecipe.title
+      setCookRecipe(null)
+      setCookedRecipesVersion((current) => current + 1)
+      setNotice(
+        `Receita "${recipeTitle}" registrada em Minhas receitas. Sua despensa foi atualizada.`,
+      )
+    } catch (error) {
+      setConsumeError(
+        error.message || 'Não foi possível registrar o consumo da receita.',
+      )
+    } finally {
+      setIsConsuming(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-background text-on-background">
-      <Sidebar onNewIngredient={openNewModal} />
+      <Sidebar
+        activeView={activeView}
+        onNavigate={handleNavigate}
+        onNewIngredient={openNewModal}
+        user={user}
+      />
 
       <div className="min-h-dvh lg:ml-64">
-        <AppHeader />
+        <AppHeader onSignOut={onSignOut} user={user} />
 
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-5 sm:px-6 lg:px-12 lg:pb-12 lg:pt-8">
+          {activeView === 'minhas-receitas' ? (
+            <MyRecipesPage
+              onGoToPantry={() => handleNavigate('despensa', 'despensa')}
+              onOpenRecipe={setSelectedRecipe}
+              refreshToken={cookedRecipesVersion}
+            />
+          ) : (
+            <>
           <section id="despensa" className="grid gap-4 lg:grid-cols-3 lg:gap-6">
             <article className="surface-card flex flex-col justify-center p-5 sm:p-6">
               <p className="mb-1 text-xs font-bold uppercase tracking-[0.16em] text-primary/70">
@@ -502,10 +646,15 @@ function App() {
               ))}
             </div>
           </section>
+            </>
+          )}
         </main>
       </div>
 
-      <MobileNavigation />
+      <MobileNavigation
+        activeView={activeView}
+        onNavigate={handleNavigate}
+      />
       <IngredientModal
         key={isModalOpen ? (editingItem ? `edit-${editingItem.id}` : 'new') : 'closed'}
         editingItem={editingItem}
@@ -559,14 +708,45 @@ function App() {
           key={selectedRecipe.id}
           isOpen={true}
           onClose={() => setSelectedRecipe(null)}
-          onCook={(recipe) => {
-            setSelectedRecipe(null)
-            alert(
-              `A receita "${recipe.title}" foi selecionada! Na próxima etapa (Fase 3), conectaremos o registro de consumo diretamente à tabela stock_movements e ao estoque.`,
-            )
-          }}
+          onCook={handleCookRecipe}
           recipe={selectedRecipe}
         />
+      )}
+
+      {cookRecipe && (
+        <CookRecipeModal
+          key={cookRecipe.id}
+          error={consumeError}
+          isSubmitting={isConsuming}
+          onClose={() => {
+            if (isConsuming) return
+            setCookRecipe(null)
+            setConsumeError('')
+          }}
+          onConfirm={handleConfirmCook}
+          pantryItems={ingredients}
+          recipe={cookRecipe}
+        />
+      )}
+
+      {notice && (
+        <div
+          className="fixed bottom-24 left-4 right-4 z-[60] flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950 shadow-lg sm:left-auto sm:right-6 sm:max-w-sm lg:bottom-6"
+          role="status"
+        >
+          <span className="material-symbols-outlined text-xl text-emerald-700">
+            check_circle
+          </span>
+          <p className="flex-1 leading-5">{notice}</p>
+          <button
+            aria-label="Fechar aviso"
+            className="shrink-0 text-emerald-800 transition hover:text-emerald-950"
+            onClick={() => setNotice('')}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
       )}
     </div>
   )
