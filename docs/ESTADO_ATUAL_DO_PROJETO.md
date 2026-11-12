@@ -18,7 +18,7 @@
 | 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes, republicação da Edge Function e deploy do frontend confirmado em produção. |
 | 1.2 | 12/11/2026 | Correção de usabilidade: o inventário da despensa passou a ter altura fixa com rolagem interna, exibindo até 4 itens antes de rolar. |
 | 2.0 | 12/11/2026 | Planejamento v3 aprovado e documentado: ordem 7 → 5 → 6 → 8 → 9 → 11 → 10, decisões de projeto, plano de testes, biblioteca de receitas com cache-first, templates de planejamento, favoritas, dark mode, lista de compras, notificações in-app e Smart Chef. Nenhuma funcionalidade do v3 foi implementada nesta versão. |
-| 2.1 | 12/11/2026 | Fase 7 implementada: tabelas `recipes` e `recipe_generations`, Edge Function cache-first com JWT, limite diário de 10 gerações, modal “Descobrir mais receitas”, normalização compartilhada e 16 testes unitários com Vitest. Migração aplicada e função publicada; validação autenticada final pendente. |
+| 2.1 | 12/11/2026 | Fase 7 implementada: tabelas `recipes` e `recipe_generations`, Edge Function cache-first com JWT, limite diário de 10 gerações, modal “Descobrir mais receitas”, normalização compartilhada e 16 testes unitários com Vitest. Migração aplicada, Edge Function e frontend publicados; validação autenticada final pendente. |
 
 
 ## 1. Finalidade deste documento
@@ -505,7 +505,8 @@ Durante a implementação foram realizados os seguintes controles:
 - smoke test da Edge Function: `OPTIONS` retorna `200`; `POST` sem JWT e com JWT inválido retornam `401`;
 - smoke test via PostgREST: `recipes` e `find_recipes_for_pantry` respondem `42501` (permission denied) para `anon`;
 - execução de `npm test` com 16 testes unitários aprovados em 2 arquivos;
-- execução do ESLint e do build do Vite após a Fase 7, sem erros (bundle `App-DGRzoN0o.js`).
+- execução do ESLint e do build do Vite após a Fase 7, sem erros (bundle `App-DGRzoN0o.js`);
+- deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app`; o chunk `App-DGRzoN0o.js` responde `200` e contém os textos do modal **Descobrir mais receitas**.
 
 > [!NOTE]
 > Todas as migrações locais estão sincronizadas com o projeto Supabase remoto em 12/11/2026: inicial, imagens, consumo, histórico, calorias, planejamento semanal e biblioteca de receitas (7 migrações). A Edge Function `recipe-suggestions` foi republicada na mesma data com o fluxo cache-first. O teste autenticado completo da Fase 7 permanece pendente.

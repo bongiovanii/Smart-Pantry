@@ -1,6 +1,6 @@
 # Escopo do Incremento 5 — Biblioteca de receitas e geração cache-first
 
-> **Status:** implementado em 12/11/2026, com migração aplicada e Edge Function publicada. A validação autenticada de ponta a ponta permanece pendente.
+> **Status:** implementado em 12/11/2026, com migração aplicada, Edge Function publicada e frontend confirmado em produção. A validação autenticada de ponta a ponta permanece pendente.
 >
 > **Projeto:** Smart Pantry — TCC
 >
@@ -324,7 +324,7 @@ Evidências de smoke test:
    npx supabase functions deploy recipe-suggestions --project-ref cojcrquveckvrdzjivmc --yes
    ```
 
-3. Publicar o frontend pelo push para `main` e confirmar o bundle na Vercel.
+3. ~~Publicar o frontend pelo push para `main` e confirmar o bundle na Vercel.~~ Publicado em 12/11/2026; o bundle `App-DGRzoN0o.js` foi confirmado em `https://smart-pantry-coral.vercel.app`.
 
 4. Validar o fluxo com uma conta autenticada:
    - abrir **Descobrir mais receitas**;
@@ -335,7 +335,7 @@ Evidências de smoke test:
    - confirmar o contador e o bloqueio após 10 gerações.
 
 > [!IMPORTANT]
-> A migração e a Edge Function estão em produção. O teste autenticado completo depende da conta Google do usuário e ainda não foi executado. O deploy do frontend deve ser confirmado após o push.
+> A migração, a Edge Function e o frontend estão em produção. O teste autenticado completo depende da conta Google do usuário e ainda não foi executado.
 
 ---
 
@@ -350,6 +350,7 @@ Evidências de smoke test:
 - `POST` com JWT inválido retornou `401`.
 - `OPTIONS` retornou `200`.
 - `recipes` e `find_recipes_for_pantry` com `anon` retornaram `42501`.
+- Deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app` (bundle `App-DGRzoN0o.js`, com os textos **Descobrir mais receitas** e **Gerar mais receitas**).
 - Teste autenticado de geração/persistência/limite permanece pendente.
 
 ---
