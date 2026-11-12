@@ -77,4 +77,28 @@ describe('createPantryItem - validação de data de validade', () => {
 
     expect(result).toEqual({ id: 'new-id', name: 'Arroz' })
   })
+
+  it('rejeita preço negativo', async () => {
+    await expect(
+      createPantryItem({
+        name: 'Arroz',
+        category: 'graos',
+        quantity: 1,
+        unit: 'kg',
+        price: -10,
+      }),
+    ).rejects.toThrow('O preço informado não pode ser negativo.')
+  })
+
+  it('permite cadastro com preço válido', async () => {
+    const result = await createPantryItem({
+      name: 'Azeite',
+      category: 'outros',
+      quantity: 1,
+      unit: 'un',
+      price: '35,90',
+    })
+
+    expect(result).toEqual({ id: 'new-id', name: 'Arroz' })
+  })
 })

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase.js'
 import { toDateOnly } from '../lib/week.js'
 
 const pantryFields =
-  'id, name, category, quantity, unit, expiration_date, created_at, updated_at'
+  'id, name, category, quantity, unit, price, expiration_date, created_at, updated_at'
 
 export async function listPantryItems() {
   await getCurrentSession()
@@ -27,6 +27,15 @@ export async function createPantryItem(item) {
     throw new Error('A data de validade não pode ser anterior a hoje.')
   }
 
+  const parsedPrice =
+    item.price !== undefined && item.price !== null && String(item.price).trim() !== ''
+      ? Number(String(item.price).replace(',', '.'))
+      : null
+
+  if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+    throw new Error('O preço informado não pode ser negativo.')
+  }
+
   const { data, error } = await supabase
     .from('pantry_items')
     .insert({
@@ -35,6 +44,7 @@ export async function createPantryItem(item) {
       category: item.category,
       quantity: Number(item.quantity),
       unit: item.unit,
+      price: parsedPrice,
       expiration_date: item.expirationDate || null,
     })
     .select(pantryFields)
@@ -48,6 +58,15 @@ export async function createPantryItem(item) {
 export async function updatePantryItem(id, item) {
   await getCurrentSession()
 
+  const parsedPrice =
+    item.price !== undefined && item.price !== null && String(item.price).trim() !== ''
+      ? Number(String(item.price).replace(',', '.'))
+      : null
+
+  if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
+    throw new Error('O preço informado não pode ser negativo.')
+  }
+
   const { data, error } = await supabase
     .from('pantry_items')
     .update({
@@ -55,6 +74,7 @@ export async function updatePantryItem(id, item) {
       category: item.category,
       quantity: Number(item.quantity),
       unit: item.unit,
+      price: parsedPrice,
       expiration_date: item.expirationDate || null,
     })
     .eq('id', id)

@@ -6,6 +6,7 @@ const initialForm = {
   category: 'outros',
   quantity: '1',
   unit: 'un',
+  price: '',
   expirationDate: '',
 }
 
@@ -37,6 +38,7 @@ function getInitialForm(editingItem) {
     category: editingItem.category || 'outros',
     quantity: String(editingItem.quantity ?? '1'),
     unit: editingItem.unit || 'un',
+    price: editingItem.price != null ? String(editingItem.price) : '',
     expirationDate: editingItem.expiration_date || '',
   }
 }
@@ -96,6 +98,16 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = nu
 
     if (form.expirationDate && form.expirationDate < today && !isExistingPastDate) {
       setError('A data de validade não pode ser anterior a hoje.')
+      return
+    }
+
+    if (
+      form.price !== undefined &&
+      form.price !== null &&
+      String(form.price).trim() !== '' &&
+      Number(String(form.price).replace(',', '.')) < 0
+    ) {
+      setError('O preço informado não pode ser negativo.')
       return
     }
 
@@ -208,7 +220,21 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = nu
             </select>
           </label>
 
-          <label className="grid gap-2 text-sm font-semibold text-on-surface sm:col-span-2">
+          <label className="grid gap-2 text-sm font-semibold text-on-surface">
+            Preço pago (R$) <span className="font-normal text-on-surface-variant">(opcional)</span>
+            <input
+              className="rounded-xl border border-outline-variant bg-white px-4 py-3 font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              min="0"
+              name="price"
+              onChange={updateField}
+              placeholder="0,00"
+              step="0.01"
+              type="number"
+              value={form.price}
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm font-semibold text-on-surface">
             Data de validade <span className="font-normal text-on-surface-variant">(opcional)</span>
             <input
               className="rounded-xl border border-outline-variant bg-white px-4 py-3 font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"

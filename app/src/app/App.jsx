@@ -1017,10 +1017,17 @@ function App({ user, onSignOut }) {
                         </div>
 
                         <div className="mt-3 flex items-center justify-between border-t border-outline-variant/30 pt-2.5">
-                          <p className="flex items-center gap-1.5 text-xs text-on-surface-variant">
-                            <span className="material-symbols-outlined text-base">event</span>
-                            {formatExpiration(ingredient.expiration_date)}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-on-surface-variant">
+                            <p className="flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-base">event</span>
+                              {formatExpiration(ingredient.expiration_date)}
+                            </p>
+                            {ingredient.price !== null && ingredient.price !== undefined && Number(ingredient.price) > 0 && (
+                              <span className="font-semibold text-primary">
+                                • R$ {Number(ingredient.price).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            )}
+                          </div>
 
                           <div className="flex items-center gap-1">
                             <button

@@ -40,6 +40,11 @@ Implementar a aba **Dashboard de Consumo**, proporcionando ao usuário uma visã
 2. **Gráficos SVG puros em React (Zero Dependências Pesadas):**
    - Não foram adicionadas bibliotecas externas pesadas; os gráficos de barras, linha de tendência com interpolação de Bézier cúbica e Donut com arcos trigonométricos foram implementados em SVG nativo responsivo com Tailwind CSS v4.
 
+3. **Migração `20261112240000_pantry_items_price.sql`:**
+   - Adição da coluna `price numeric(10, 2) check (price >= 0)` em `public.pantry_items`;
+   - Atualização da RPC `create_pantry_item_with_entry` para receber `p_price numeric default null`;
+   - Atualização da RPC `get_consumption_dashboard_data` para calcular o desperdício financeiro com base no preço real pago (`p.price`), mantendo a tabela de preços médios por categoria como fallback seguro.
+
 ---
 
 ## 3. Serviços e módulos criados
