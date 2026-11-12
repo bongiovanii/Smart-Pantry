@@ -2,9 +2,9 @@
 
 **Data:** 12 de novembro de 2026
 
-**Versão:** 1.4
+**Versão:** 1.5
 
-**Status:** em execução; Fases 7, 5, 10 e 9 concluídas em 12/11/2026; fases 6, 8 e 11 planejadas; Fase 6 (Favoritas) é a próxima.
+**Status:** em execução; Fases 7, 5, 10, 9 e 6 concluídas em 12/11/2026; fases 8 e 11 planejadas; Fase 8 (Dark mode) é a próxima.
 
 **Documentos relacionados:**
 - [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) — perguntas e respostas que orientam este plano.
@@ -503,11 +503,11 @@ Permitir favoritar receitas em qualquer lugar e reuni-las em uma seção **Favor
 
 ### 7.4 Critérios de pronto
 
-- [ ] Favoritar e desfavoritar funciona em todos os pontos previstos.
-- [ ] A favorita continua abrindo mesmo que a receita não esteja nas sugestões atuais.
-- [ ] A aba Favoritas lista, busca, ordena e remove favoritas.
-- [ ] RLS impede acessar favoritas de outro usuário.
-- [ ] Testes e build passam.
+- [x] Favoritar e desfavoritar funciona em todos os pontos previstos.
+- [x] A favorita continua abrindo mesmo que a receita não esteja nas sugestões atuais.
+- [x] A aba Favoritas lista, busca, ordena e remove favoritas.
+- [x] RLS impede acessar favoritas de outro usuário.
+- [x] Testes e build passam.
 
 ---
 
@@ -989,7 +989,9 @@ Uma fase só é considerada concluída quando:
 4. ~~Registrar o incremento em `docs/ESCOPO_INCREMENTO_5.md`~~ (concluído).
 5. ~~Implementar a **Fase 5 — Templates de planejamento**: ciclo de 4 semanas, até 4 templates, RPCs transacionais, página `PlanningPage.jsx` completa, modais e histórico~~ (concluída em 12/11/2026).
 6. ~~Registrar o incremento em `docs/ESCOPO_INCREMENTO_6.md`~~ (concluído).
-7. Iniciar a **Fase 6 — Favoritas**: botão favorito, persistência e abas em “Minhas receitas”.
+7. ~~Iniciar a **Fase 6 — Favoritas**: botão favorito, persistência e abas em “Minhas receitas”~~ (concluída em 12/11/2026).
+8. Registrar o incremento em `docs/ESCOPO_INCREMENTO_9.md` (concluído).
+9. Iniciar a **Fase 8 — Dark mode e aba Configurações**.
 
 ---
 
@@ -1000,3 +1002,6 @@ Uma fase só é considerada concluída quando:
 | 1.0 | 12/11/2026 | Criação do plano v3 com as fases 7 → 5 → 6 → 8 → 9 → 11 → 10, modelo de dados, RPCs, critérios de pronto e riscos. |
 | 1.1 | 12/11/2026 | Fase 7 registrada como concluída; próximos passos atualizados para a Fase 5. |
 | 1.2 | 12/11/2026 | Fase 5 registrada como concluída com templates, ciclo de 4 semanas e histórico; próximos passos atualizados para a Fase 6 (Favoritas). |
+| 1.3 | 12/11/2026 | Fase 10 (Notificações) registrada como concluída antecipadamente no Incremento 7. |
+| 1.4 | 12/11/2026 | Fase 9 (Lista de compras e reposição) registrada como concluída no Incremento 8. |
+| 1.5 | 12/11/2026 | Fase 6 (Favoritas) registrada como concluída no Incremento 9; próximos passos atualizados para a Fase 8 (Dark mode). |

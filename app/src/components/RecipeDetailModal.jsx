@@ -1,10 +1,19 @@
 import { useEffect, useId } from 'react'
+import FavoriteButton from './FavoriteButton.jsx'
 
 // Com a migração para o Gemini, os passos de preparo (steps), tempo e porções
 // chegam embutidos no objeto recipe retornado pela Edge Function.
 // Não há necessidade de uma segunda requisição para buscar detalhes.
 
-function RecipeDetailModal({ isOpen, recipe, onClose, onCook, onPlan }) {
+function RecipeDetailModal({
+  isOpen,
+  recipe,
+  onClose,
+  onCook,
+  onPlan,
+  isFavorite = false,
+  onToggleFavorite,
+}) {
   const titleId = useId()
 
   useEffect(() => {
@@ -54,14 +63,21 @@ function RecipeDetailModal({ isOpen, recipe, onClose, onCook, onPlan }) {
             src={recipe.image}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <button
-            aria-label="Fechar detalhes da receita"
-            className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface shadow-md backdrop-blur transition hover:bg-white"
-            onClick={onClose}
-            type="button"
-          >
-            <span className="material-symbols-outlined text-xl">close</span>
-          </button>
+          <div className="absolute right-3 top-3 flex items-center gap-2">
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onToggle={onToggleFavorite}
+              recipe={recipe}
+            />
+            <button
+              aria-label="Fechar detalhes da receita"
+              className="grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface shadow-md backdrop-blur transition hover:bg-white"
+              onClick={onClose}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+          </div>
 
           <div className="absolute bottom-3 left-4 right-4 text-white sm:bottom-4 sm:left-6 sm:right-6">
             <span className="inline-block rounded-full bg-primary/90 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider backdrop-blur">

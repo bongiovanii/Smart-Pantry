@@ -118,6 +118,8 @@ function PlanningPage({
   onRemoveMeal,
   onOpenRecipe,
   onNotice,
+  isFavorite,
+  onToggleFavorite,
 }) {
   const [templates, setTemplates] = useState([])
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true)
@@ -436,11 +438,13 @@ function PlanningPage({
         description="Clique em + para adicionar uma refeição a qualquer dia."
         error={planError}
         eyebrow="Semana atual"
+        isFavorite={isFavorite}
         isLoading={isPlanLoading}
         onAddMeal={onAddMeal}
         onOpenRecipe={onOpenRecipe}
         onRemoveMeal={onRemoveMeal}
         onRetry={onRetryPlan}
+        onToggleFavorite={onToggleFavorite}
         plan={plan}
         sectionId="planejamento-semana-atual"
         title="Refeições da semana"
@@ -705,10 +709,12 @@ function PlanningPage({
 
       {historyTarget && (
         <PlanHistoryModal
+          isFavorite={isFavorite}
           isOpen={Boolean(historyTarget)}
           key={historyTarget.weekStart}
           onClose={() => setHistoryTarget(null)}
           onOpenRecipe={onOpenRecipe}
+          onToggleFavorite={onToggleFavorite}
           week={historyTarget}
         />
       )}

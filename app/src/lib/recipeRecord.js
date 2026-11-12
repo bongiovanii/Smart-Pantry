@@ -39,6 +39,8 @@ export function normalizeRecipeFromApi(recipe) {
     imageLicense: recipe?.imageLicense || '',
     imageLicenseUrl: recipe?.imageLicenseUrl || '',
     imageSourceUrl: recipe?.imageSourceUrl || '',
+    isFavorite: Boolean(recipe?.is_favorite ?? recipe?.isFavorite),
+    favoritedAt: recipe?.favorited_at ?? recipe?.favoritedAt ?? null,
     origin: recipe?.origin || 'ai',
   }
 }
@@ -79,6 +81,8 @@ export function normalizeRecipeFromRow(row, origin = 'library') {
     imageLicenseUrl: row?.image_license_url || '',
     imageSourceUrl: row?.image_source_url || '',
     isFavorite: Boolean(row?.is_favorite),
+    favoritedAt: row?.favorited_at || null,
+    source: row?.source || 'cooked',
     origin,
   }
 }

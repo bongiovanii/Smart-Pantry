@@ -1,16 +1,25 @@
+import FavoriteButton from './FavoriteButton.jsx'
 import { DAY_LABELS, MEAL_TYPES, WEEK_DAYS } from '../lib/mealPlan.js'
 import { formatShortDate, getDateForDay } from '../lib/week.js'
 
-function MealCard({ entry, onOpenRecipe, onRemove, readOnly = false }) {
+function MealCard({
+  entry,
+  onOpenRecipe,
+  onRemove,
+  readOnly = false,
+  isFavorite = false,
+  onToggleFavorite,
+}) {
   const { recipe } = entry
+  const hasRemove = !readOnly && typeof onRemove === 'function'
+  const hasFav = typeof onToggleFavorite === 'function'
+  const prClass = hasRemove && hasFav ? 'pr-16' : hasRemove || hasFav ? 'pr-9' : ''
 
   return (
     <div className="relative">
       <button
         aria-label={`Ver detalhes de ${recipe.title}`}
-        className={`flex w-full flex-col gap-1 rounded-xl border border-secondary-container bg-secondary-container/40 p-3 text-left transition hover:border-primary/40 ${
-          readOnly ? '' : 'pr-9'
-        }`}
+        className={`flex w-full flex-col gap-1 rounded-xl border border-secondary-container bg-secondary-container/40 p-3 text-left transition hover:border-primary/40 ${prClass}`}
         onClick={() => onOpenRecipe?.(recipe)}
         type="button"
       >
@@ -36,16 +45,28 @@ function MealCard({ entry, onOpenRecipe, onRemove, readOnly = false }) {
         </span>
       </button>
 
-      {!readOnly && onRemove && (
-        <button
-          aria-label={`Remover ${recipe.title} do planejamento`}
-          className="absolute right-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-lg text-on-surface-variant transition hover:bg-red-50 hover:text-red-700"
-          onClick={() => onRemove(entry)}
-          title="Remover do planejamento"
-          type="button"
-        >
-          <span className="material-symbols-outlined text-base">close</span>
-        </button>
+      {(hasFav || hasRemove) && (
+        <div className="absolute right-1.5 top-1.5 flex items-center gap-1">
+          {hasFav && (
+            <FavoriteButton
+              isFavorite={isFavorite}
+              onToggle={onToggleFavorite}
+              recipe={recipe}
+              size="sm"
+            />
+          )}
+          {hasRemove && (
+            <button
+              aria-label={`Remover ${recipe.title} do planejamento`}
+              className="grid h-7 w-7 place-items-center rounded-lg text-on-surface-variant transition hover:bg-red-50 hover:text-red-700"
+              onClick={() => onRemove(entry)}
+              title="Remover do planejamento"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-base">close</span>
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -59,6 +80,8 @@ function WeekPlanner({
   onAddMeal,
   onRemoveMeal,
   onOpenRecipe,
+  isFavorite,
+  onToggleFavorite,
   eyebrow = 'Sua semana',
   title = 'Planejamento semanal',
   description = '',
@@ -170,9 +193,15 @@ function WeekPlanner({
                   {entries.map((entry) => (
                     <MealCard
                       entry={entry}
+                      isFavorite={
+                        typeof isFavorite === 'function'
+                          ? isFavorite(entry.recipe)
+                          : Boolean(entry.recipe?.isFavorite)
+                      }
                       key={entry.planId}
                       onOpenRecipe={onOpenRecipe}
                       onRemove={onRemoveMeal}
+                      onToggleFavorite={onToggleFavorite}
                       readOnly={readOnly}
                     />
                   ))}

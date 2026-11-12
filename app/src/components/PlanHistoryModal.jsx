@@ -3,7 +3,14 @@ import WeekPlanner from './WeekPlanner.jsx'
 import { listWeeklyPlan } from '../services/mealPlan.js'
 import { formatWeekRange } from '../lib/week.js'
 
-function PlanHistoryModal({ isOpen, week, onClose, onOpenRecipe }) {
+function PlanHistoryModal({
+  isOpen,
+  week,
+  onClose,
+  onOpenRecipe,
+  isFavorite,
+  onToggleFavorite,
+}) {
   const titleId = useId()
   const [plan, setPlan] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -102,8 +109,10 @@ function PlanHistoryModal({ isOpen, week, onClose, onOpenRecipe }) {
             emptyMessage="Nenhuma refeição registrada"
             error={error}
             eyebrow=""
+            isFavorite={isFavorite}
             isLoading={isLoading}
             onOpenRecipe={onOpenRecipe}
+            onToggleFavorite={onToggleFavorite}
             plan={plan}
             readOnly
             sectionId=""

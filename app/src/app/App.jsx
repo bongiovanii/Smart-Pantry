@@ -17,6 +17,7 @@ import ShoppingListPage from './ShoppingListPage.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
+import { normalizeRecipeTitle } from '../lib/recipeNormalization.js'
 import { mergeRecipeLists } from '../lib/recipeRecord.js'
 import {
   assignMealToDay,
@@ -40,6 +41,10 @@ import {
   updatePantryItem,
 } from '../services/pantry.js'
 import { listRecipesByIngredients } from '../services/recipe.js'
+import {
+  listFavoriteRecipes,
+  toggleFavoriteRecipe,
+} from '../services/recipeLibrary.js'
 import { getUserSettings, updateUserSettings } from '../services/userSettings.js'
 
 const sidebarItems = [
@@ -231,6 +236,8 @@ function App({ user, onSignOut }) {
   const [entryItem, setEntryItem] = useState(null)
   const [isEntrySubmitting, setIsEntrySubmitting] = useState(false)
   const [entryError, setEntryError] = useState('')
+  const [favoriteTitles, setFavoriteTitles] = useState(() => new Set())
+  const [favoriteVersion, setFavoriteVersion] = useState(0)
 
   async function loadIngredients() {
     setIsLoading(true)
@@ -353,6 +360,30 @@ function App({ user, onSignOut }) {
       window.clearInterval(intervalId)
     }
   }, [])
+
+  // Carrega a lista de receitas favoritas para sincronização instantânea em toda a UI.
+  useEffect(() => {
+    let isActive = true
+
+    listFavoriteRecipes()
+      .then((favorites) => {
+        if (isActive) {
+          const titles = new Set(
+            favorites
+              .map((r) => normalizeRecipeTitle(r.title))
+              .filter(Boolean),
+          )
+          setFavoriteTitles(titles)
+        }
+      })
+      .catch((error) => {
+        console.error('Erro ao carregar receitas favoritas:', error)
+      })
+
+    return () => {
+      isActive = false
+    }
+  }, [user?.id, favoriteVersion])
 
   // Carrega o planejamento semanal salvo do usuário e sincroniza o ciclo de 4 semanas.
   useEffect(() => {
@@ -716,6 +747,49 @@ function App({ user, onSignOut }) {
     }
   }
 
+  async function handleToggleFavorite(recipe) {
+    if (!recipe?.title) return
+    try {
+      const updated = await toggleFavoriteRecipe(recipe)
+      const normTitle = normalizeRecipeTitle(updated.title)
+
+      setFavoriteTitles((prev) => {
+        const next = new Set(prev)
+        if (updated.isFavorite) {
+          next.add(normTitle)
+        } else {
+          next.delete(normTitle)
+        }
+        return next
+      })
+      setFavoriteVersion((v) => v + 1)
+
+      if (
+        selectedRecipe &&
+        normalizeRecipeTitle(selectedRecipe.title) === normTitle
+      ) {
+        setSelectedRecipe((current) =>
+          current ? { ...current, isFavorite: updated.isFavorite } : null,
+        )
+      }
+
+      setNotice(
+        updated.isFavorite
+          ? `"${updated.title}" adicionada às favoritas.`
+          : `"${updated.title}" removida das favoritas.`,
+      )
+      return updated
+    } catch (error) {
+      console.error('Erro ao alternar favorito:', error)
+      setNotice('Não foi possível atualizar as receitas favoritas.')
+    }
+  }
+
+  function isRecipeFavorite(recipe) {
+    if (!recipe?.title) return false
+    return favoriteTitles.has(normalizeRecipeTitle(recipe.title))
+  }
+
   return (
     <div className="min-h-dvh bg-background text-on-background">
       <Sidebar
@@ -739,12 +813,16 @@ function App({ user, onSignOut }) {
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-5 sm:px-6 lg:px-12 lg:pb-12 lg:pt-8">
           {activeView === 'minhas-receitas' ? (
             <MyRecipesPage
+              favoriteTitles={favoriteTitles}
+              isFavorite={isRecipeFavorite}
               onGoToPantry={() => handleNavigate('despensa', 'despensa')}
               onOpenRecipe={setSelectedRecipe}
-              refreshToken={cookedRecipesVersion}
+              onToggleFavorite={handleToggleFavorite}
+              refreshToken={cookedRecipesVersion + favoriteVersion}
             />
           ) : activeView === 'planejamento' ? (
             <PlanningPage
+              isFavorite={isRecipeFavorite}
               isPlanLoading={isPlanLoading}
               onAddMeal={handleAddMeal}
               onNotice={(msg) => setNotice(msg)}
@@ -752,6 +830,7 @@ function App({ user, onSignOut }) {
               onReloadPlan={loadWeeklyPlan}
               onRemoveMeal={handleRemoveMeal}
               onRetryPlan={loadWeeklyPlan}
+              onToggleFavorite={handleToggleFavorite}
               plan={weeklyPlan}
               planContext={planContext}
               planError={planLoadError}
@@ -956,9 +1035,12 @@ function App({ user, onSignOut }) {
             <div className="recipe-grid">
               {recipes.map((recipe) => (
                 <FeatureCard
+                  isFavorite={isRecipeFavorite(recipe)}
                   key={recipe.id}
                   onClick={() => setSelectedRecipe(recipe)}
                   onPlan={() => handlePlanRecipe(recipe)}
+                  onToggleFavorite={handleToggleFavorite}
+                  recipe={recipe}
                   {...recipe}
                 />
               ))}
@@ -1009,11 +1091,13 @@ function App({ user, onSignOut }) {
 
           <WeekPlanner
             error={planLoadError}
+            isFavorite={isRecipeFavorite}
             isLoading={isPlanLoading}
             onAddMeal={handleAddMeal}
             onOpenRecipe={setSelectedRecipe}
             onRemoveMeal={handleRemoveMeal}
             onRetry={loadWeeklyPlan}
+            onToggleFavorite={handleToggleFavorite}
             plan={weeklyPlan}
             weekStart={planContext?.weekStart}
           />
@@ -1098,11 +1182,13 @@ function App({ user, onSignOut }) {
 
       {selectedRecipe && (
         <RecipeDetailModal
-          key={selectedRecipe.id}
+          isFavorite={isRecipeFavorite(selectedRecipe)}
           isOpen={true}
+          key={selectedRecipe.id}
           onClose={() => setSelectedRecipe(null)}
           onCook={handleCookRecipe}
           onPlan={handlePlanRecipe}
+          onToggleFavorite={handleToggleFavorite}
           recipe={selectedRecipe}
         />
       )}

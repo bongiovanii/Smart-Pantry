@@ -2,11 +2,11 @@
 
 **Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 2.4
+**Versão do documento:** 2.5
 
-**Fase atual:** fases 1 a 5, Fase 7, Fase 9 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, notificações de vencimento, central de configurações, e minha lista de compras com reposição). As fases 6, 8 e 11 estão planejadas; a Fase 6 (Favoritas) é a próxima.
+**Fase atual:** fases 1 a 7, Fase 9 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, receitas favoritas com aba dedicada e sincronização reativa, notificações de vencimento, central de configurações, e minha lista de compras com reposição). As fases 8 (Dark mode) e 11 (Smart Chef) estão planejadas; a Fase 8 é a próxima.
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md) — lista de compras e fluxo de reposição. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md), [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
+**Incremento documentado:** [`ESCOPO_INCREMENTO_9.md`](./ESCOPO_INCREMENTO_9.md) — botão favorito, persistência e aba Favoritas em Minhas receitas. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md), [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md), [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
 **Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
 
@@ -22,6 +22,7 @@
 | 2.2 | 12/11/2026 | Fase 5 implementada: tabelas `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items` e `meal_plan_weeks`, evolução de `meal_plans` com `week_start`, 7 RPCs transacionais, página `PlanningPage.jsx` completa, modais de templates e histórico, validação de validade futura na despensa, e 44 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 | 2.3 | 12/11/2026 | Fase 10 implementada: tabelas `user_settings` e `notifications`, RPCs `generate_expiration_notifications`, `snooze_notification`, `mark_all_notifications_as_read` e `get_or_create_user_settings`, componentes `NotificationsPanel`, `SettingsPage`, badge de não lidas no `AppHeader`, atalho de configurações na navegação, e 52 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 | 2.4 | 12/11/2026 | Fase 9 implementada: tabela `shopping_list_items`, RPCs `record_pantry_entry`, `create_pantry_item_with_entry`, `mark_shopping_item_purchased` e `get_shopping_suggestions`, tela `ShoppingListPage.jsx`, modais `ShoppingItemModal`, `PurchaseItemModal` e `PantryEntryModal`, aba de lista de compras na navegação principal e 62 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
+| 2.5 | 12/11/2026 | Fase 6 implementada: botão favorito reativo `FavoriteButton.jsx` integrado a todas as superfícies de receitas (`FeatureCard`, `RecipeDetailModal`, `WeekPlanner`, `PlanHistoryModal` e `MyRecipesPage`), serviços `toggleFavoriteRecipe` e `listFavoriteRecipes`, aba dedicada **Favoritas** em Minhas receitas com busca e ordenação, e 67 testes unitários passando. |
 
 
 ## 1. Finalidade deste documento

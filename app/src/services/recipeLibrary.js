@@ -1,5 +1,8 @@
 import { normalizeRecipeFromRow } from '../lib/recipeRecord.js'
-import { normalizeRecipeTitle } from '../lib/recipeNormalization.js'
+import {
+  buildIngredientNames,
+  normalizeRecipeTitle,
+} from '../lib/recipeNormalization.js'
 import { getCurrentSession } from '../lib/session.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -22,6 +25,7 @@ const RECIPE_FIELDS = [
   'missed_ingredients',
   'steps',
   'ingredient_names',
+  'source',
   'is_favorite',
   'favorited_at',
   'created_at',
@@ -181,4 +185,156 @@ export async function findRecipeByTitle(title) {
   if (error) throw error
 
   return data ? normalizeRecipeFromRow(data) : null
+}
+
+/**
+ * Alterna o estado de favorito de uma receita.
+ *
+ * Se a receita já estiver na biblioteca do usuário, inverte `is_favorite` e
+ * atualiza `favorited_at`. Se for nova (ex.: vinda de sugestão externa ou
+ * gerador), salva o snapshot completo com `source: 'cooked'` e `is_favorite: true`.
+ */
+export async function toggleFavoriteRecipe(recipe) {
+  const session = await getCurrentSession()
+  const title = String(recipe?.title ?? '').trim()
+  if (!title) {
+    throw new Error('A receita precisa de um título válido.')
+  }
+
+  const titleNormalized = normalizeRecipeTitle(title)
+  if (!titleNormalized) {
+    throw new Error('Título da receita inválido.')
+  }
+
+  // 1. Verifica se a receita já existe na biblioteca do usuário
+  const { data: existing, error: findError } = await supabase
+    .from('recipes')
+    .select(RECIPE_FIELDS)
+    .eq('user_id', session.user.id)
+    .eq('title_normalized', titleNormalized)
+    .maybeSingle()
+
+  if (findError) throw findError
+
+  if (existing) {
+    const nextFavorite = !existing.is_favorite
+    const nextFavoritedAt = nextFavorite ? new Date().toISOString() : null
+
+    const { data: updated, error: updateError } = await supabase
+      .from('recipes')
+      .update({
+        is_favorite: nextFavorite,
+        favorited_at: nextFavoritedAt,
+      })
+      .eq('id', existing.id)
+      .eq('user_id', session.user.id)
+      .select(RECIPE_FIELDS)
+      .single()
+
+    if (updateError) throw updateError
+    return normalizeRecipeFromRow(updated)
+  }
+
+  // 2. Se não existir, faz insert do snapshot com is_favorite = true
+  const usedIngredients = Array.isArray(recipe?.usedIngredients)
+    ? recipe.usedIngredients
+    : Array.isArray(recipe?.used_ingredients)
+      ? recipe.used_ingredients
+      : []
+
+  const missedIngredients = Array.isArray(recipe?.missedIngredients)
+    ? recipe.missedIngredients
+    : Array.isArray(recipe?.missed_ingredients)
+      ? recipe.missed_ingredients
+      : []
+
+  const steps = Array.isArray(recipe?.steps) ? recipe.steps : []
+  const ingredientNames = buildIngredientNames(recipe)
+
+  const newRow = {
+    user_id: session.user.id,
+    title,
+    title_normalized: titleNormalized,
+    category: recipe?.category || 'outros',
+    image: recipe?.image || null,
+    image_query: recipe?.imageQuery || recipe?.image_query || null,
+    image_source: recipe?.imageSource || recipe?.image_source || null,
+    image_author: recipe?.imageAuthor || recipe?.image_author || null,
+    image_license: recipe?.imageLicense || recipe?.image_license || null,
+    image_license_url:
+      recipe?.imageLicenseUrl || recipe?.image_license_url || null,
+    image_source_url:
+      recipe?.imageSourceUrl || recipe?.image_source_url || null,
+    ready_in_minutes: Math.max(
+      0,
+      Number(recipe?.readyInMinutes ?? recipe?.ready_in_minutes ?? 0),
+    ),
+    servings: Math.max(0, Number(recipe?.servings ?? 0)),
+    calories_per_serving: Math.max(
+      0,
+      Number(recipe?.caloriesPerServing ?? recipe?.calories_per_serving ?? 0),
+    ),
+    used_ingredients: usedIngredients,
+    missed_ingredients: missedIngredients,
+    steps,
+    ingredient_names: ingredientNames,
+    source: recipe?.source || 'cooked',
+    is_favorite: true,
+    favorited_at: new Date().toISOString(),
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('recipes')
+    .insert(newRow)
+    .select(RECIPE_FIELDS)
+    .single()
+
+  if (insertError) {
+    // Corrida com chave única (user_id, title_normalized): reexecuta alternando
+    if (insertError.code === '23505') {
+      return toggleFavoriteRecipe(recipe)
+    }
+    throw insertError
+  }
+
+  return normalizeRecipeFromRow(inserted)
+}
+
+/**
+ * Lista as receitas favoritas do usuário ordenadas por data de adição ou por título.
+ */
+export async function listFavoriteRecipes({
+  search = '',
+  sort = 'recent',
+} = {}) {
+  const session = await getCurrentSession()
+
+  let query = supabase
+    .from('recipes')
+    .select(RECIPE_FIELDS)
+    .eq('user_id', session.user.id)
+    .eq('is_favorite', true)
+
+  if (sort === 'title') {
+    query = query.order('title', { ascending: true })
+  } else {
+    query = query
+      .order('favorited_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+  }
+
+  const term = search.trim()
+  if (term) {
+    const safeTerm = term.replace(/[%,()*]/g, ' ').trim()
+    if (safeTerm) {
+      query = query.or(
+        `title.ilike.%${safeTerm}%,category.ilike.%${safeTerm}%`,
+      )
+    }
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+
+  return (data ?? []).map((row) => normalizeRecipeFromRow(row))
 }

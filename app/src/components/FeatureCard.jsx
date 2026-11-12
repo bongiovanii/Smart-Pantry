@@ -1,3 +1,5 @@
+import FavoriteButton from './FavoriteButton.jsx'
+
 function FeatureCard({
   title,
   time,
@@ -7,7 +9,21 @@ function FeatureCard({
   imageSource,
   onClick,
   onPlan,
+  isFavorite = false,
+  onToggleFavorite,
+  recipe,
+  ...rest
 }) {
+  const currentRecipe = recipe || {
+    title,
+    time,
+    ingredients,
+    caloriesPerServing,
+    image,
+    imageSource,
+    ...rest,
+  }
+
   return (
     <article
       aria-label={`Ver detalhes da receita ${title}`}
@@ -55,17 +71,12 @@ function FeatureCard({
             calendar_month
           </span>
         </button>
-        <button
-          className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface-variant shadow-sm backdrop-blur transition hover:text-primary"
-          aria-label={`Favoritar ${title}`}
-          onClick={(event) => {
-            event.stopPropagation()
-            // Funcionalidade de favoritar prevista
-          }}
-          type="button"
-        >
-          <span className="material-symbols-outlined text-xl">favorite</span>
-        </button>
+        <FavoriteButton
+          className="absolute right-2 top-2"
+          isFavorite={isFavorite}
+          onToggle={onToggleFavorite}
+          recipe={currentRecipe}
+        />
       </div>
       <div className="p-4">
         <h3 className="truncate text-base font-bold text-on-surface sm:text-lg">{title}</h3>
