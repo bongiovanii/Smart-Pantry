@@ -2,13 +2,13 @@
 
 **Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 2.5
+**Versão do documento:** 2.6
 
-**Fase atual:** fases 1 a 7, Fase 9 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, receitas favoritas com aba dedicada e sincronização reativa, notificações de vencimento, central de configurações, e minha lista de compras com reposição). As fases 8 (Dark mode) e 11 (Smart Chef) estão planejadas; a Fase 8 é a próxima.
+**Fase atual:** fases 1 a 7, 9, 10 e 12 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, receitas favoritas com aba dedicada e sincronização reativa, notificações de vencimento, central de configurações, lista de compras inteligente com reposição e dashboard analítico de consumo & desperdício). As fases 8 (Dark mode) e 11 (Smart Chef) estão planejadas; a Fase 8 é a próxima.
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_9.md`](./ESCOPO_INCREMENTO_9.md) — botão favorito, persistência e aba Favoritas em Minhas receitas. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md), [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md), [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
+**Incremento documentado:** [`ESCOPO_INCREMENTO_10.md`](./ESCOPO_INCREMENTO_10.md) — Dashboard de Consumo, métricas de desperdício, custo financeiro, aproveitamento, alimentos em risco, impacto ecológico e modal de triagem na despensa. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_9.md`](./ESCOPO_INCREMENTO_9.md), [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md), [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md), [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
-**Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
+**Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md) e [`plano_dashboard_consumo.md`](./plano_dashboard_consumo.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
 
 ## Histórico de versões deste documento
 
@@ -23,6 +23,7 @@
 | 2.3 | 12/11/2026 | Fase 10 implementada: tabelas `user_settings` e `notifications`, RPCs `generate_expiration_notifications`, `snooze_notification`, `mark_all_notifications_as_read` e `get_or_create_user_settings`, componentes `NotificationsPanel`, `SettingsPage`, badge de não lidas no `AppHeader`, atalho de configurações na navegação, e 52 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 | 2.4 | 12/11/2026 | Fase 9 implementada: tabela `shopping_list_items`, RPCs `record_pantry_entry`, `create_pantry_item_with_entry`, `mark_shopping_item_purchased` e `get_shopping_suggestions`, tela `ShoppingListPage.jsx`, modais `ShoppingItemModal`, `PurchaseItemModal` e `PantryEntryModal`, aba de lista de compras na navegação principal e 62 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 | 2.5 | 12/11/2026 | Fase 6 implementada: botão favorito reativo `FavoriteButton.jsx` integrado a todas as superfícies de receitas (`FeatureCard`, `RecipeDetailModal`, `WeekPlanner`, `PlanHistoryModal` e `MyRecipesPage`), serviços `toggleFavoriteRecipe` e `listFavoriteRecipes`, aba dedicada **Favoritas** em Minhas receitas com busca e ordenação, e 67 testes unitários passando. |
+| 2.6 | 12/11/2026 | Fase 12 implementada: aba **Dashboard de Consumo** com 4 KPIs analíticos, histórico semanal de desperdício em barras + linha de tendência, painel de alimentos em risco com CTA de receitas, gráfico Donut de categorias, métricas de impacto ecológico (litros de água e kg de CO2) e modal de triagem na despensa (`PantryDeleteModal`). Migração remota aplicada e 87 testes unitários passando. |
 
 
 ## 1. Finalidade deste documento

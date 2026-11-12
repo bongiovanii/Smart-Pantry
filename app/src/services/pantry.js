@@ -108,3 +108,36 @@ export async function recordPantryEntry(
 
   return data
 }
+
+/**
+ * Registra a baixa de um alimento na despensa classificando o motivo:
+ * - 'consumed': consumido fora do app (movimentação 'consumption')
+ * - 'wasted': estragou / venceu (movimentação 'waste')
+ * - 'mistake': erro de cadastro (apenas arquiva)
+ */
+export async function recordPantryDiscard(
+  itemId,
+  disposition = 'mistake',
+  reason = '',
+) {
+  await getCurrentSession()
+
+  if (!itemId) {
+    throw new Error('Alimento não informado.')
+  }
+
+  const validDispositions = ['consumed', 'wasted', 'mistake']
+  if (!validDispositions.includes(disposition)) {
+    throw new Error('Motivo de baixa inválido.')
+  }
+
+  const { data, error } = await supabase.rpc('record_pantry_discard', {
+    p_item_id: itemId,
+    p_disposition: disposition,
+    p_reason: reason || null,
+  })
+
+  if (error) throw error
+
+  return data
+}

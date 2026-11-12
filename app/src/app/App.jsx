@@ -14,6 +14,8 @@ import MyRecipesPage from './MyRecipesPage.jsx'
 import PlanningPage from './PlanningPage.jsx'
 import SettingsPage from './SettingsPage.jsx'
 import ShoppingListPage from './ShoppingListPage.jsx'
+import ConsumptionDashboardPage from './ConsumptionDashboardPage.jsx'
+import PantryDeleteModal from '../components/PantryDeleteModal.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
@@ -33,9 +35,9 @@ import {
   snoozeNotification,
 } from '../services/notifications.js'
 import {
-  archivePantryItem,
   createPantryItem,
   listPantryItems,
+  recordPantryDiscard,
   recordPantryEntry,
   updatePantryItem,
 } from '../services/pantry.js'
@@ -73,6 +75,12 @@ const sidebarItems = [
     view: 'lista-de-compras',
   },
   {
+    id: 'consumo',
+    label: 'Dashboard de Consumo',
+    icon: 'analytics',
+    view: 'dashboard-consumo',
+  },
+  {
     id: 'configuracoes',
     label: 'Configurações',
     icon: 'settings',
@@ -107,6 +115,12 @@ const mobileItems = [
     view: 'lista-de-compras',
   },
   {
+    id: 'consumo',
+    label: 'Consumo',
+    icon: 'analytics',
+    view: 'dashboard-consumo',
+  },
+  {
     id: 'configuracoes',
     label: 'Ajustes',
     icon: 'settings',
@@ -118,6 +132,7 @@ function isNavItemActive(item, activeView) {
   if (item.view === 'minhas-receitas') return activeView === 'minhas-receitas'
   if (item.view === 'planejamento') return activeView === 'planejamento'
   if (item.view === 'lista-de-compras') return activeView === 'lista-de-compras'
+  if (item.view === 'dashboard-consumo') return activeView === 'dashboard-consumo'
   if (item.view === 'configuracoes') return activeView === 'configuracoes'
   return item.id === 'despensa' && activeView === 'despensa'
 }
@@ -171,7 +186,7 @@ function Sidebar({ activeView, onNavigate, onNewIngredient, user }) {
 
 function MobileNavigation({ activeView, onNavigate }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-outline-variant bg-white px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_18px_rgba(25,28,27,0.08)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-outline-variant bg-white px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_18px_rgba(25,28,27,0.08)] lg:hidden">
       {mobileItems.map((item) => (
         <button
           className={`mobile-nav-item ${
@@ -507,19 +522,19 @@ function App({ user, onSignOut }) {
     }
   }
 
-  async function handleConfirmDelete() {
+  async function handleConfirmDiscard({ disposition, reason }) {
     if (!deletingItem) return
     setIsDeleting(true)
 
     try {
-      await archivePantryItem(deletingItem.id)
+      await recordPantryDiscard(deletingItem.id, disposition, reason)
       setIngredients((current) =>
         current.filter((item) => item.id !== deletingItem.id),
       )
       setDeletingItem(null)
       generateExpirationNotifications().then(setNotifications).catch(() => {})
     } catch (error) {
-      alert(error.message || 'Não foi possível remover o ingrediente.')
+      alert(error.message || 'Não foi possível registrar a baixa do alimento.')
     } finally {
       setIsDeleting(false)
     }
@@ -884,6 +899,18 @@ function App({ user, onSignOut }) {
               pantryItems={ingredients}
               weeklyPlan={weeklyPlan}
             />
+          ) : activeView === 'dashboard-consumo' ? (
+            <ConsumptionDashboardPage
+              onFindRecipesForIngredient={() => {
+                setIsDiscoverOpen(true)
+              }}
+              onNavigateToSuggestions={() => {
+                handleNavigate('despensa', 'despensa')
+                setTimeout(() => {
+                  document.getElementById('receitas-sugeridas')?.scrollIntoView({ behavior: 'smooth' })
+                }, 100)
+              }}
+            />
           ) : activeView === 'configuracoes' ? (
             <SettingsPage
               isUpdatingSettings={isUpdatingSettings}
@@ -1191,39 +1218,12 @@ function App({ user, onSignOut }) {
       />
 
       {deletingItem && (
-        <div
-          aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-on-background/45 p-4 backdrop-blur-[2px]"
-          role="dialog"
-        >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-center gap-3 text-red-700">
-              <span className="material-symbols-outlined text-3xl">delete</span>
-              <h3 className="text-lg font-bold text-on-surface">Remover ingrediente</h3>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
-              Deseja remover <strong>{deletingItem.name}</strong> da sua despensa? O item será arquivado do seu estoque atual.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                className="rounded-xl border border-outline-variant px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-surface-container-low"
-                disabled={isDeleting}
-                onClick={() => setDeletingItem(null)}
-                type="button"
-              >
-                Cancelar
-              </button>
-              <button
-                className="rounded-xl bg-red-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-red-800 disabled:opacity-60"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                type="button"
-              >
-                {isDeleting ? 'Removendo...' : 'Confirmar remoção'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <PantryDeleteModal
+          isSubmitting={isDeleting}
+          item={deletingItem}
+          onClose={() => setDeletingItem(null)}
+          onConfirm={handleConfirmDiscard}
+        />
       )}
 
       {isDiscoverOpen && (
