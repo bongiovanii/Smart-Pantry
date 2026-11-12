@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import UserAvatar from './UserAvatar.jsx'
 
-function AppHeader({ user, onSignOut }) {
+function AppHeader({
+  user,
+  onSignOut,
+  unreadNotificationsCount = 0,
+  onToggleNotifications,
+  onOpenSettings,
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const menuRef = useRef(null)
@@ -58,8 +64,24 @@ function AppHeader({ user, onSignOut }) {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <button className="icon-button" aria-label="Notificações">
-            <span className="material-symbols-outlined">notifications</span>
+          <button
+            aria-label={
+              unreadNotificationsCount > 0
+                ? `Notificações (${unreadNotificationsCount} não lidas)`
+                : 'Notificações'
+            }
+            className="icon-button relative"
+            onClick={onToggleNotifications}
+            type="button"
+          >
+            <span className="material-symbols-outlined">
+              {unreadNotificationsCount > 0 ? 'notifications_active' : 'notifications'}
+            </span>
+            {unreadNotificationsCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white shadow-sm">
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </span>
+            )}
           </button>
 
           <div className="relative" ref={menuRef}>
@@ -97,6 +119,23 @@ function AppHeader({ user, onSignOut }) {
                     </p>
                   </div>
                 </div>
+
+                {onOpenSettings && (
+                  <button
+                    className="flex w-full items-center gap-2 border-b border-outline-variant/60 px-4 py-3 text-left text-sm font-semibold text-on-surface transition hover:bg-surface-container-low"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      onOpenSettings()
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-xl text-on-surface-variant">
+                      settings
+                    </span>
+                    Configurações
+                  </button>
+                )}
 
                 <button
                   className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-red-700 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"

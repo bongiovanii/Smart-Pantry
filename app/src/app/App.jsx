@@ -5,10 +5,13 @@ import DiscoverRecipesModal from '../components/DiscoverRecipesModal.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
 import PlanMealModal from '../components/PlanMealModal.jsx'
+import NotificationsPanel from '../components/NotificationsPanel.jsx'
 import RecipeDetailModal from '../components/RecipeDetailModal.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import WeekPlanner from '../components/WeekPlanner.jsx'
 import MyRecipesPage from './MyRecipesPage.jsx'
+import PlanningPage from './PlanningPage.jsx'
+import SettingsPage from './SettingsPage.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
@@ -17,8 +20,16 @@ import {
   assignMealToDay,
   listWeeklyPlan,
   removeMealPlan,
+  syncCurrentWeek,
 } from '../services/mealPlan.js'
 import { consumeRecipeIngredients } from '../services/movements.js'
+import {
+  dismissNotification,
+  generateExpirationNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  snoozeNotification,
+} from '../services/notifications.js'
 import {
   archivePantryItem,
   createPantryItem,
@@ -26,7 +37,7 @@ import {
   updatePantryItem,
 } from '../services/pantry.js'
 import { listRecipesByIngredients } from '../services/recipe.js'
-
+import { getUserSettings, updateUserSettings } from '../services/userSettings.js'
 
 const sidebarItems = [
   {
@@ -46,15 +57,13 @@ const sidebarItems = [
     id: 'planejamento',
     label: 'Planejamento',
     icon: 'calendar_month',
-    view: 'despensa',
-    section: 'planejamento',
+    view: 'planejamento',
   },
   {
     id: 'configuracoes',
     label: 'Configurações',
     icon: 'settings',
-    view: 'despensa',
-    section: 'configuracoes',
+    view: 'configuracoes',
   },
 ]
 
@@ -76,20 +85,20 @@ const mobileItems = [
     id: 'planejamento',
     label: 'Planejar',
     icon: 'calendar_month',
-    view: 'despensa',
-    section: 'planejamento',
+    view: 'planejamento',
   },
   {
     id: 'configuracoes',
     label: 'Ajustes',
     icon: 'settings',
-    view: 'despensa',
-    section: 'configuracoes',
+    view: 'configuracoes',
   },
 ]
 
 function isNavItemActive(item, activeView) {
   if (item.view === 'minhas-receitas') return activeView === 'minhas-receitas'
+  if (item.view === 'planejamento') return activeView === 'planejamento'
+  if (item.view === 'configuracoes') return activeView === 'configuracoes'
   return item.id === 'despensa' && activeView === 'despensa'
 }
 
@@ -191,11 +200,18 @@ function App({ user, onSignOut }) {
   const [consumeError, setConsumeError] = useState('')
   const [notice, setNotice] = useState('')
   const [weeklyPlan, setWeeklyPlan] = useState([])
+  const [planContext, setPlanContext] = useState(null)
   const [isPlanLoading, setIsPlanLoading] = useState(true)
   const [planLoadError, setPlanLoadError] = useState('')
   const [planTarget, setPlanTarget] = useState(null)
   const [isPlanning, setIsPlanning] = useState(false)
   const [planSubmitError, setPlanSubmitError] = useState('')
+  const [notifications, setNotifications] = useState([])
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false)
+  const [notificationsError, setNotificationsError] = useState('')
+  const [userSettings, setUserSettings] = useState(null)
+  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
 
   async function loadIngredients() {
     setIsLoading(true)
@@ -215,7 +231,12 @@ function App({ user, onSignOut }) {
     setPlanLoadError('')
 
     try {
-      setWeeklyPlan(await listWeeklyPlan())
+      const [context, entries] = await Promise.all([
+        syncCurrentWeek().catch(() => null),
+        listWeeklyPlan(),
+      ])
+      if (context) setPlanContext(context)
+      setWeeklyPlan(entries)
     } catch (error) {
       setPlanLoadError(
         error.message || 'Não foi possível carregar o planejamento semanal.',
@@ -248,13 +269,83 @@ function App({ user, onSignOut }) {
     }
   }, [])
 
-  // Carrega o planejamento semanal salvo do usuário.
+  async function loadNotifications() {
+    setIsNotificationsLoading(true)
+    setNotificationsError('')
+    try {
+      const items = await generateExpirationNotifications()
+      setNotifications(items)
+    } catch (error) {
+      setNotificationsError(
+        error.message || 'Não foi possível carregar as notificações.',
+      )
+    } finally {
+      setIsNotificationsLoading(false)
+    }
+  }
+
+  // Carrega as configurações do usuário ao iniciar.
+  useEffect(() => {
+    let isActive = true
+    getUserSettings()
+      .then((settings) => {
+        if (isActive) setUserSettings(settings)
+      })
+      .catch(() => {
+        // Ignora erro inicial mantendo configuração padrão
+      })
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  // Carrega as notificações ao iniciar, no foco da janela e periodicamente.
   useEffect(() => {
     let isActive = true
 
-    listWeeklyPlan()
-      .then((entries) => {
+    async function syncNotifications() {
+      try {
+        const items = await generateExpirationNotifications()
         if (isActive) {
+          setNotifications(items)
+          setNotificationsError('')
+        }
+      } catch (error) {
+        if (isActive) {
+          setNotificationsError(
+            error.message || 'Não foi possível carregar as notificações.',
+          )
+        }
+      }
+    }
+
+    syncNotifications()
+
+    function handleFocus() {
+      syncNotifications()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    const intervalId = window.setInterval(syncNotifications, 60 * 60 * 1000)
+
+    return () => {
+      isActive = false
+      window.removeEventListener('focus', handleFocus)
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
+  // Carrega o planejamento semanal salvo do usuário e sincroniza o ciclo de 4 semanas.
+  useEffect(() => {
+    let isActive = true
+
+    Promise.all([
+      syncCurrentWeek().catch(() => null),
+      listWeeklyPlan(),
+    ])
+      .then(([context, entries]) => {
+        if (isActive) {
+          if (context) setPlanContext(context)
           setWeeklyPlan(entries)
           setPlanLoadError('')
         }
@@ -361,6 +452,7 @@ function App({ user, onSignOut }) {
       }
       setIsModalOpen(false)
       setEditingItem(null)
+      generateExpirationNotifications().then(setNotifications).catch(() => {})
     } finally {
       setIsSaving(false)
     }
@@ -376,6 +468,7 @@ function App({ user, onSignOut }) {
         current.filter((item) => item.id !== deletingItem.id),
       )
       setDeletingItem(null)
+      generateExpirationNotifications().then(setNotifications).catch(() => {})
     } catch (error) {
       alert(error.message || 'Não foi possível remover o ingrediente.')
     } finally {
@@ -506,6 +599,79 @@ function App({ user, onSignOut }) {
     }
   }
 
+  async function handleMarkNotificationRead(id) {
+    try {
+      const updated = await markNotificationAsRead(id)
+      setNotifications((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      )
+    } catch (error) {
+      setNotificationsError(
+        error.message || 'Não foi possível marcar a notificação como lida.',
+      )
+    }
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    try {
+      await markAllNotificationsAsRead()
+      setNotifications((current) =>
+        current.map((item) => ({ ...item, status: 'read', isUnread: false })),
+      )
+    } catch (error) {
+      setNotificationsError(
+        error.message || 'Não foi possível marcar as notificações como lidas.',
+      )
+    }
+  }
+
+  async function handleSnoozeNotification(id) {
+    try {
+      await snoozeNotification(id, 1)
+      setNotifications((current) => current.filter((item) => item.id !== id))
+      setNotice('Notificação adiada por 1 dia.')
+    } catch (error) {
+      setNotificationsError(
+        error.message || 'Não foi possível adiar a notificação.',
+      )
+    }
+  }
+
+  async function handleDismissNotification(id) {
+    try {
+      await dismissNotification(id)
+      setNotifications((current) => current.filter((item) => item.id !== id))
+    } catch (error) {
+      setNotificationsError(
+        error.message || 'Não foi possível dispensar a notificação.',
+      )
+    }
+  }
+
+  function handleSuggestRecipeFromNotification(notification) {
+    setIsNotificationsOpen(false)
+    handleNavigate('despensa', 'receitas')
+    const item = ingredients.find((i) => i.id === notification.pantryItemId)
+    if (item) {
+      setNotice(
+        `Dica: priorize receitas com "${item.name}" para evitar o vencimento!`,
+      )
+    }
+  }
+
+  async function handleToggleNotificationsSetting(nextEnabled) {
+    setIsUpdatingSettings(true)
+    try {
+      const updated = await updateUserSettings({
+        notificationsEnabled: nextEnabled,
+      })
+      setUserSettings(updated)
+      await loadNotifications()
+    } finally {
+      setIsUpdatingSettings(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-background text-on-background">
       <Sidebar
@@ -516,7 +682,15 @@ function App({ user, onSignOut }) {
       />
 
       <div className="min-h-dvh lg:ml-64">
-        <AppHeader onSignOut={onSignOut} user={user} />
+        <AppHeader
+          onOpenSettings={() => handleNavigate('configuracoes')}
+          onSignOut={onSignOut}
+          onToggleNotifications={() => setIsNotificationsOpen((curr) => !curr)}
+          unreadNotificationsCount={
+            notifications.filter((n) => n.isUnread).length
+          }
+          user={user}
+        />
 
         <main className="mx-auto w-full max-w-[1440px] px-4 pb-28 pt-5 sm:px-6 lg:px-12 lg:pb-12 lg:pt-8">
           {activeView === 'minhas-receitas' ? (
@@ -524,6 +698,28 @@ function App({ user, onSignOut }) {
               onGoToPantry={() => handleNavigate('despensa', 'despensa')}
               onOpenRecipe={setSelectedRecipe}
               refreshToken={cookedRecipesVersion}
+            />
+          ) : activeView === 'planejamento' ? (
+            <PlanningPage
+              isPlanLoading={isPlanLoading}
+              onAddMeal={handleAddMeal}
+              onNotice={(msg) => setNotice(msg)}
+              onOpenRecipe={setSelectedRecipe}
+              onReloadPlan={loadWeeklyPlan}
+              onRemoveMeal={handleRemoveMeal}
+              onRetryPlan={loadWeeklyPlan}
+              plan={weeklyPlan}
+              planContext={planContext}
+              planError={planLoadError}
+            />
+          ) : activeView === 'configuracoes' ? (
+            <SettingsPage
+              isUpdatingSettings={isUpdatingSettings}
+              onGoToPantry={() => handleNavigate('despensa', 'despensa')}
+              onSignOut={onSignOut}
+              onToggleNotifications={handleToggleNotificationsSetting}
+              settings={userSettings}
+              user={user}
             />
           ) : (
             <>
@@ -754,6 +950,7 @@ function App({ user, onSignOut }) {
             onRemoveMeal={handleRemoveMeal}
             onRetry={loadWeeklyPlan}
             plan={weeklyPlan}
+            weekStart={planContext?.weekStart}
           />
             </>
           )}
@@ -877,6 +1074,23 @@ function App({ user, onSignOut }) {
           recipes={recipes}
         />
       )}
+
+      <NotificationsPanel
+        error={notificationsError}
+        isLoading={isNotificationsLoading}
+        isOpen={isNotificationsOpen}
+        notifications={notifications}
+        onClose={() => setIsNotificationsOpen(false)}
+        onDismiss={handleDismissNotification}
+        onMarkAllAsRead={handleMarkAllNotificationsRead}
+        onMarkAsRead={handleMarkNotificationRead}
+        onOpenSettings={() => {
+          setIsNotificationsOpen(false)
+          handleNavigate('configuracoes')
+        }}
+        onSnooze={handleSnoozeNotification}
+        onSuggestRecipe={handleSuggestRecipeFromNotification}
+      />
 
       {notice && (
         <div

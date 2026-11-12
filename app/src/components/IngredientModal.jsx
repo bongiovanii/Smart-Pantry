@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import { toDateOnly } from '../lib/week.js'
 
 const initialForm = {
   name: '',
@@ -46,6 +47,16 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = nu
   const [error, setError] = useState('')
   const isEditing = Boolean(editingItem)
 
+  const today = toDateOnly()
+  const isExistingPastDate =
+    isEditing &&
+    editingItem?.expiration_date &&
+    form.expirationDate === editingItem.expiration_date
+  const minDate =
+    isEditing && editingItem?.expiration_date && editingItem.expiration_date < today
+      ? editingItem.expiration_date
+      : today
+
   useEffect(() => {
     if (!isOpen) return undefined
 
@@ -80,6 +91,11 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = nu
 
     if (!form.quantity || Number(form.quantity) <= 0) {
       setError('Informe uma quantidade maior que zero.')
+      return
+    }
+
+    if (form.expirationDate && form.expirationDate < today && !isExistingPastDate) {
+      setError('A data de validade não pode ser anterior a hoje.')
       return
     }
 
@@ -196,6 +212,7 @@ function IngredientModal({ isOpen, isSaving, onClose, onSubmit, editingItem = nu
             Data de validade <span className="font-normal text-on-surface-variant">(opcional)</span>
             <input
               className="rounded-xl border border-outline-variant bg-white px-4 py-3 font-normal outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+              min={minDate}
               name="expirationDate"
               onChange={updateField}
               type="date"

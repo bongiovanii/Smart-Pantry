@@ -166,12 +166,12 @@ function PlanningPage({
   useEffect(() => {
     let isActive = true
 
-    setIsLoadingTemplates(true)
-    setTemplatesError('')
-
     listTemplates()
       .then((result) => {
-        if (isActive) setTemplates(result)
+        if (isActive) {
+          setTemplates(result)
+          setTemplatesError('')
+        }
       })
       .catch((error) => {
         if (isActive) {
@@ -192,12 +192,12 @@ function PlanningPage({
   useEffect(() => {
     let isActive = true
 
-    setIsLoadingHistory(true)
-    setHistoryError('')
-
     listPlanHistory({ page: historyPage, pageSize: HISTORY_PAGE_SIZE })
       .then((result) => {
-        if (isActive) setHistory(result)
+        if (isActive) {
+          setHistory(result)
+          setHistoryError('')
+        }
       })
       .catch((error) => {
         if (isActive) {
@@ -216,10 +216,12 @@ function PlanningPage({
   }, [historyPage, historyVersion])
 
   function reloadTemplates() {
+    setIsLoadingTemplates(true)
     setTemplatesVersion((current) => current + 1)
   }
 
   function reloadHistory() {
+    setIsLoadingHistory(true)
     setHistoryVersion((current) => current + 1)
   }
 
@@ -535,7 +537,220 @@ function PlanningPage({
         )}
       </section>
 
-      {/* __PART2__ */}
+      {/* Seção de Histórico */}
+      <section className="mt-9 lg:mt-12">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary/70">
+              Arquivo
+            </p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-primary sm:text-3xl">
+              Histórico de semanas
+            </h2>
+            <p className="mt-1 text-sm text-on-surface-variant">
+              Consulte as refeições planejadas em semanas anteriores do ciclo.
+            </p>
+          </div>
+          {history.totalCount > 0 && (
+            <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface-variant">
+              {history.totalCount}{' '}
+              {history.totalCount === 1 ? 'semana registrada' : 'semanas registradas'}
+            </span>
+          )}
+        </div>
+
+        {isLoadingHistory && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div
+                className="surface-card min-h-28 animate-pulse bg-surface-container-low"
+                key={item}
+              />
+            ))}
+          </div>
+        )}
+
+        {!isLoadingHistory && historyError && (
+          <div
+            className="mt-4 rounded-xl bg-red-50 p-4 text-sm text-red-800"
+            role="alert"
+          >
+            <p className="font-bold">Não foi possível carregar o histórico.</p>
+            <p className="mt-1">{historyError}</p>
+            <button
+              className="mt-3 font-bold underline"
+              onClick={reloadHistory}
+              type="button"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {!isLoadingHistory && !historyError && history.weeks.length === 0 && (
+          <div className="surface-card mt-4 p-8 text-center text-on-surface-variant">
+            <span className="material-symbols-outlined text-4xl text-outline">
+              history_toggle_off
+            </span>
+            <p className="mt-2 text-sm font-semibold">
+              Nenhuma semana anterior registrada ainda.
+            </p>
+            <p className="mt-1 text-xs text-outline">
+              Conforme as semanas forem avançando no ciclo, o histórico será
+              guardado aqui automaticamente.
+            </p>
+          </div>
+        )}
+
+        {!isLoadingHistory && !historyError && history.weeks.length > 0 && (
+          <>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {history.weeks.map((week) => (
+                <article
+                  className="surface-card flex flex-col justify-between p-4"
+                  key={week.weekStart}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-secondary-container px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                        Semana {week.weekIndex} do ciclo
+                      </span>
+                      <span className="text-xs font-semibold text-on-surface-variant">
+                        {week.mealCount}{' '}
+                        {week.mealCount === 1 ? 'refeição' : 'refeições'}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-2 text-sm font-bold text-primary">
+                      {formatWeekRange(week.weekStart)}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-on-surface-variant">
+                      {week.templateName
+                        ? `Template: ${week.templateName}`
+                        : 'Sem template aplicado'}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 border-t border-outline-variant/60 pt-3">
+                    <button
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-outline-variant bg-white px-3 py-2 text-xs font-bold text-primary transition hover:bg-surface-container-low"
+                      onClick={() => setHistoryTarget(week)}
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-base">visibility</span>
+                      Ver refeições
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            {history.totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  className="rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-surface-container-low disabled:opacity-50"
+                  disabled={historyPage <= 1}
+                  onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                  type="button"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs font-semibold text-on-surface-variant">
+                  Página {historyPage} de {history.totalPages}
+                </span>
+                <button
+                  className="rounded-xl border border-outline-variant bg-white px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-surface-container-low disabled:opacity-50"
+                  disabled={historyPage >= history.totalPages}
+                  onClick={() => setHistoryPage((p) => p + 1)}
+                  type="button"
+                >
+                  Próxima
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {formState && (
+        <TemplateFormModal
+          availableWeeks={formState.availableWeeks}
+          error={formError}
+          isOpen={Boolean(formState)}
+          isSubmitting={isSavingForm}
+          key={`${formState.mode}-${formState.template?.id || formState.weekIndex}`}
+          mode={formState.mode}
+          onClose={() => setFormState(null)}
+          onSubmit={handleFormSubmit}
+          template={formState.template}
+          weekIndex={formState.weekIndex}
+        />
+      )}
+
+      {editorTemplate && (
+        <TemplateEditorModal
+          isOpen={Boolean(editorTemplate)}
+          key={editorTemplate.id}
+          onChanged={() => {
+            reloadTemplates()
+            reloadHistory()
+            onReloadPlan?.()
+          }}
+          onClose={() => setEditorTemplate(null)}
+          onOpenRecipe={onOpenRecipe}
+          template={editorTemplate}
+        />
+      )}
+
+      {historyTarget && (
+        <PlanHistoryModal
+          isOpen={Boolean(historyTarget)}
+          key={historyTarget.weekStart}
+          onClose={() => setHistoryTarget(null)}
+          onOpenRecipe={onOpenRecipe}
+          week={historyTarget}
+        />
+      )}
+
+      <ConfirmDialog
+        confirmLabel={isApplying ? 'Aplicando...' : 'Aplicar template'}
+        description={`Isso substituirá as refeições da semana atual (${formatWeekRange(weekStart)}) pelas refeições do template "${applyTarget?.name}". Esta ação não pode ser desfeita.`}
+        error={applyError}
+        icon="play_arrow"
+        isOpen={Boolean(applyTarget)}
+        isSubmitting={isApplying}
+        onCancel={() => setApplyTarget(null)}
+        onConfirm={handleApply}
+        title={`Aplicar "${applyTarget?.name}"?`}
+        tone="primary"
+      />
+
+      <ConfirmDialog
+        confirmLabel={isDeleting ? 'Excluindo...' : 'Excluir template'}
+        description={`O template "${deleteTarget?.name}" e suas refeições associadas serão excluídos permanentemente. A semana atual e as semanas anteriores já registradas não serão alteradas.`}
+        error={deleteError}
+        icon="delete"
+        isOpen={Boolean(deleteTarget)}
+        isSubmitting={isDeleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title={`Excluir "${deleteTarget?.name}"?`}
+        tone="danger"
+      />
+
+      <ConfirmDialog
+        confirmLabel={isStartingCycle ? 'Iniciando...' : 'Iniciar novo ciclo'}
+        description="A semana atual passará a ser considerada a Semana 1 de um novo ciclo de 4 semanas. Seus templates cadastrados serão preservados e reutilizados na nova contagem."
+        error={cycleError}
+        icon="restart_alt"
+        isOpen={isCycleConfirmOpen}
+        isSubmitting={isStartingCycle}
+        onCancel={() => setIsCycleConfirmOpen(false)}
+        onConfirm={handleStartNewCycle}
+        title="Iniciar novo ciclo de 4 semanas?"
+        tone="primary"
+      />
     </div>
   )
 }

@@ -2,11 +2,11 @@
 
 **Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 2.1
+**Versão do documento:** 2.3
 
-**Fase atual:** fases 1 a 4 e Fase 7 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente, biblioteca de receitas e geração cache-first). As fases 5, 6, 8, 9, 11 e 10 estão planejadas; a Fase 5 é a próxima.
+**Fase atual:** fases 1 a 5, Fase 7 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, notificações de vencimento e central de configurações). As fases 6, 8, 9 e 11 estão planejadas; a Fase 6 (Favoritas) é a próxima.
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md) — biblioteca de receitas e geração cache-first. O incremento anterior permanece em [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md).
+**Incremento documentado:** [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md) — notificações de vencimento e central de configurações. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
 **Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
 
@@ -19,6 +19,8 @@
 | 1.2 | 12/11/2026 | Correção de usabilidade: o inventário da despensa passou a ter altura fixa com rolagem interna, exibindo até 4 itens antes de rolar. |
 | 2.0 | 12/11/2026 | Planejamento v3 aprovado e documentado: ordem 7 → 5 → 6 → 8 → 9 → 11 → 10, decisões de projeto, plano de testes, biblioteca de receitas com cache-first, templates de planejamento, favoritas, dark mode, lista de compras, notificações in-app e Smart Chef. Nenhuma funcionalidade do v3 foi implementada nesta versão. |
 | 2.1 | 12/11/2026 | Fase 7 implementada: tabelas `recipes` e `recipe_generations`, Edge Function cache-first com JWT, limite diário de 10 gerações, modal “Descobrir mais receitas”, normalização compartilhada e 16 testes unitários com Vitest. Migração aplicada, Edge Function e frontend publicados; validação autenticada final pendente. |
+| 2.2 | 12/11/2026 | Fase 5 implementada: tabelas `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items` e `meal_plan_weeks`, evolução de `meal_plans` com `week_start`, 7 RPCs transacionais, página `PlanningPage.jsx` completa, modais de templates e histórico, validação de validade futura na despensa, e 44 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
+| 2.3 | 12/11/2026 | Fase 10 implementada: tabelas `user_settings` e `notifications`, RPCs `generate_expiration_notifications`, `snooze_notification`, `mark_all_notifications_as_read` e `get_or_create_user_settings`, componentes `NotificationsPanel`, `SettingsPage`, badge de não lidas no `AppHeader`, atalho de configurações na navegação, e 52 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 
 
 ## 1. Finalidade deste documento
@@ -273,12 +275,12 @@ A ordem de execução definida é **7 → 5 → 6 → 8 → 9 → 11 → 10**, p
 | Fase | Funcionalidade | Depende de | Status |
 |---|---|---|---|
 | 7 | Biblioteca de receitas persistida + geração cache-first + “Descobrir mais receitas” | — | Implementada em 12/11/2026 |
-| 5 | Aba de planejamento com até 4 templates, ciclo de 4 semanas e histórico | Fase 7 | Planejada (próxima) |
-| 6 | Favoritas com snapshot e abas em “Minhas receitas” | Fase 7 | Planejada |
+| 5 | Aba de planejamento com até 4 templates, ciclo de 4 semanas e histórico | Fase 7 | Implementada em 12/11/2026 |
+| 6 | Favoritas com snapshot e abas em “Minhas receitas” | Fase 7 | Planejada (próxima) |
 | 8 | Aba Configurações com dark mode | — | Planejada |
 | 9 | Fluxo de entrada/reposição + aba “Minha lista de compras” | Fase 5 e histórico de movimentações | Planejada |
 | 11 | Chatbot Smart Chef (stretch) | Fases 7 e 9 | Planejada (stretch) |
-| 10 | Notificações de vencimento in-app (stretch) | Fase 11 | Planejada (stretch) |
+| 10 | Notificações de vencimento in-app (stretch) | — | Implementada em 12/11/2026 |
 
 Decisões estruturais registradas:
 
@@ -307,6 +309,24 @@ A Fase 7 mudou o ciclo das receitas: elas deixaram de ser efêmeras e passaram a
 
 A decisão de persistir por upsert direto no PostgREST, em vez da RPC `upsert_generated_recipes` prevista no plano, está justificada em [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
+### 5.17 Templates de planejamento semanal, ciclo de 4 semanas e histórico (Fase 5)
+
+A Fase 5 implementou o sistema completo de planejamento alimentar com ciclo de 4 semanas e templates:
+- **Tabelas e ciclo:** `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items` e `meal_plan_weeks`, com evolução de `meal_plans` para suportar `week_start`.
+- **Recorrência:** ciclo contínuo de 4 semanas que avança a cada segunda-feira e repete os templates a cada mês.
+- **Aba dedicada:** `PlanningPage.jsx` com visualização da semana atual, gestão de até 4 templates (`TemplateEditorModal`, `TemplateFormModal`) e histórico de semanas anteriores (`PlanHistoryModal`).
+- **Validação de validade futura na despensa:** o cadastro e edição de alimentos agora rejeitam datas de validade anteriores ao dia atual no fuso de Brasília.
+- O detalhamento completo está em [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md).
+
+### 5.18 Notificações de vencimento e central de configurações (Fase 10)
+
+A Fase 10 implementou os alertas in-app para alimentos que estão próximos da validade ou já venceram:
+- **Modelo:** tabelas `user_settings` (preferências de notificações e tema) e `notifications` (avisos vinculados aos alimentos).
+- **Geração e deduplicação:** RPC `generate_expiration_notifications()` no PostgreSQL que identifica alimentos da despensa com validade em até 7 dias ou vencidos e cria no máximo um aviso por item por dia civil no fuso de Brasília.
+- **Central de notificações:** `NotificationsPanel.jsx` acessível pelo ícone de sino no `AppHeader`, com badge contador de itens não lidos, ações rápidas de "Ver receitas", "Adiar 1 dia" (`snooze_notification`), "Marcar como lida" e "Ler todas" (`mark_all_notifications_as_read`).
+- **Central de configurações:** `SettingsPage.jsx` com toggle interativo para ligar ou desligar notificações de vencimento, dados da conta Google e botão de logout.
+- O detalhamento completo está em [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md).
+
 ## 6. Organização atual dos principais componentes
 
 | Elemento | Responsabilidade no sistema |
@@ -314,22 +334,33 @@ A decisão de persistir por upsert direto no PostgREST, em vez da RPC `upsert_ge
 | `Root.jsx` | Resolve a sessão inicial e controla o fluxo landing → login → aplicativo. |
 | `LandingPage.jsx` | Apresenta a proposta do produto e direciona para login ou criação de conta. |
 | `LoginScreen.jsx` | Oferece o login/cadastro com Google e trata carregamento e erros do OAuth. |
-| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas” e as seções de planejamento/configurações, coordena o registro de consumo e integra o modal de descoberta de receitas. |
+| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas”, planejamento e configurações, coordena notificações, consumo e descoberta de receitas. |
 | `MyRecipesPage.jsx` | Exibe o inventário, a busca e a linha do tempo das receitas executadas pelo usuário. |
+| `PlanningPage.jsx` | Tela completa de planejamento com semana atual, templates do ciclo de 4 semanas e histórico. |
+| `SettingsPage.jsx` | Central de preferências do usuário (toggle de notificações, conta conectada e logout). |
 | `WeekPlanner.jsx` | Renderiza a grade semanal persistente, com adicionar, abrir e remover refeições. |
 | `PlanMealModal.jsx` | Permite escolher dia, tipo de refeição e receita antes de gravar o slot. |
-| `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente. |
+| `PlanHistoryModal.jsx` | Modal somente leitura para visualização de semanas passadas do histórico de planejamento. |
+| `TemplateEditorModal.jsx` | Editor interativo de templates dia a dia com receitas da biblioteca. |
+| `TemplateFormModal.jsx` | Criação e renomeação de templates. |
+| `TemplateItemModal.jsx` | Seleção de receita da biblioteca para slot do template. |
+| `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente (com bloqueio de datas retroativas). |
 | `RecipeDetailModal.jsx` | Exibe ingredientes, tempo, porções e modo de preparo da receita. |
 | `CookRecipeModal.jsx` | Confirma quais itens da despensa serão consumidos e em que quantidade. |
 | `DiscoverRecipesModal.jsx` | Lista a biblioteca, busca, pagina e gera mais receitas. |
+| `NotificationsPanel.jsx` | Painel deslizante com avisos de validade, ações de receita, adiar e marcar lida. |
 | `FeatureCard.jsx` | Apresenta visualmente uma receita. |
-| `AppHeader.jsx` | Apresenta o cabeçalho, o avatar e o menu da conta com logout. |
+| `AppHeader.jsx` | Apresenta o cabeçalho, sino de notificações com badge, avatar e menu da conta com atalho para configurações. |
 | `UserAvatar.jsx` | Exibe o avatar do Google com fallback para a inicial do nome. |
 | `pantry.js` | Executa os casos de consulta e cadastro da despensa. |
 | `movements.js` | Registra o consumo dos ingredientes e o snapshot da receita via RPC transacional. |
 | `userRecipes.js` | Consulta o histórico de receitas do usuário e normaliza os snapshots salvos. |
 | `mealPlan.js` (serviço) | Lista, agenda/substitui e remove refeições do planejamento semanal. |
+| `mealPlanTemplates.js` (serviço) | Gestão de templates de planejamento, ciclo de 4 semanas e histórico. |
+| `notifications.js` (serviço) | Geração de alertas de validade, marcação de lidas, adiamento e descarte. |
+| `userSettings.js` (serviço) | Consulta e atualização das preferências do usuário no Supabase. |
 | `mealPlan.js` (lib) | Define dias da semana, rótulos e tipos de refeição aceitos pelo banco. |
+| `week.js` (lib) | Funções puras de cálculo de semanas, segundas-feiras e ciclo de 4 semanas. |
 | `recipeSnapshot.js` | Monta o snapshot compartilhado de receita usado pelo consumo e pelo planejamento. |
 | `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas, incluindo os metadados de cache e limite. |
 | `recipeLibrary.js` (serviço) | Lista a biblioteca, consulta o status de gerações e busca por título. |
@@ -346,19 +377,18 @@ A decisão de persistir por upsert direto no PostgREST, em vez da RPC `upsert_ge
 | Migração de calorias | Adiciona `calories_per_serving` ao histórico e amplia a RPC de consumo. |
 | Migração do planejamento | Cria `meal_plans` com RLS, restrição de slot único e snapshot da receita. |
 | Migração da biblioteca | Cria `recipes`, `recipe_generations`, índices, RLS e a RPC `find_recipes_for_pantry`. |
+| Migração de templates | Cria `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items`, `meal_plan_weeks` e 7 RPCs transacionais. |
+| Migração de notificações | Cria `user_settings`, `notifications` e RPCs de geração, adiamento e leitura. |
 
 ### 6.1 Componentes previstos para as fases restantes do v3
 
 | Elemento planejado | Fase | Responsabilidade |
 |---|---|---|
-| `PlanningPage.jsx` | 5 | Aba com semana atual, templates, ciclo de 4 semanas e histórico. |
-| `TemplateEditorModal.jsx` | 5 | Edição da grade semanal em modo template. |
 | `FavoriteButton.jsx` | 6 | Alterna favorito em cards, modais, histórico e planejamento. |
-| `ThemeProvider.jsx` / `SettingsPage.jsx` | 8 | Tema claro/escuro/sistema e preferências. |
+| `ThemeProvider.jsx` | 8 | Aplicação de tema claro/escuro/sistema integrado a `user_settings`. |
 | `ShoppingListPage.jsx` | 9 | Sugestões, itens manuais, faltantes do planejamento e compras. |
 | `PantryEntryModal.jsx` | 9 | Registro de entrada/reposição na despensa. |
 | `SmartChefModal.jsx` | 11 | Chat com o chef, histórico, limite diário e ações estruturadas. |
-| `NotificationsPanel.jsx` | 10 | Central de avisos de vencimento in-app. |
 
 ## 7. Decisões de engenharia já adotadas
 
@@ -437,11 +467,11 @@ Essa distinção será usada quando os requisitos forem revisados.
 | Movimentação de estoque | Implementada (consumo) | Consumo total/parcial de receitas grava em `stock_movements` e atualiza a despensa de forma transacional. |
 | Histórico “Minhas receitas” | Implementado | Tabela `user_recipes` com RLS, inventário agrupado, busca e linha do tempo por usuário. |
 | Alertas de validade | Planejados | Ainda não existe regra ativa ou central de alertas. |
-| Planejamento semanal | Implementado (Fase 4) | Slots persistentes por dia e tipo de refeição, com snapshot da receita, substituição e remoção. Templates, ciclo de 4 semanas e histórico estão planejados para a Fase 5. |
+| Planejamento semanal com templates e histórico | Implementado (Fase 5) | Aba de planejamento com ciclo de 4 semanas, até 4 templates, aplicação atômica, editor de grade e histórico paginado de semanas passadas. |
 | Biblioteca de receitas com IA | Implementada (Fase 7) | Tabela `recipes` com snapshot, deduplicação por título, RLS e geração cache-first. |
 | Favoritas | Planejada (Fase 6) | Favorito com snapshot e aba própria em “Minhas receitas”. |
 | Descobrir mais receitas | Implementado (Fase 7) | Modal com a biblioteca persistida, busca, paginação de 20 e geração de mais receitas. |
-| Testes automatizados | Implementado (Fase 7) | Vitest com 16 testes unitários de normalização, contrato e deduplicação. |
+| Testes automatizados | Implementado (Fases 7 e 5) | Vitest com 44 testes unitários cobrindo normalização, ciclo de semanas, templates de planejamento e despensa. |
 | Dark mode / Configurações | Planejado (Fase 8) | Tema claro, escuro e sistema, persistido em `localStorage`. |
 | Lista de compras | Planejada (Fase 9) | Sugestões por consumo/entradas, faltantes do planejamento e itens manuais. |
 | Entrada/reposição de estoque | Planejada (Fase 9) | Fluxo de `entry` em `stock_movements` e atualização transacional do saldo. |
@@ -457,8 +487,8 @@ Essa distinção será usada quando os requisitos forem revisados.
 - A tabela `stock_movements` recebe os consumos de receitas, mas ainda não possui tela própria de histórico; o histórico visível hoje é o de receitas executadas. O fluxo de entrada e a lista de compras do v3 usarão essa base.
 - Ainda não é possível registrar um descarte e seu motivo.
 - Os alertas de validade não foram implementados; estão planejados como notificações in-app na Fase 10 (stretch).
-- O planejamento semanal é recorrente e ainda não possui `week_start`, templates, ciclo de 4 semanas ou histórico; isso está planejado para a Fase 5.
 - Cada slot do planejamento aceita apenas uma receita; prato principal e acompanhamento exigem slots separados ou uma receita combinada.
+- O planejamento semanal possui limite de 4 templates por usuário (um para cada semana do ciclo de 4 semanas).
 - Não existe lista de compras automática a partir dos ingredientes faltantes do planejamento; a Fase 9 prevê essa derivação.
 - O cache compara nomes normalizados literalmente; sinônimos e variações regionais podem não casar. O mínimo de 2 ingredientes em comum também pode excluir receitas que usam apenas 1 item da despensa.
 - O limite diário conta chamadas de geração, não receitas individuais; uma chamada que gera várias receitas consome uma geração.

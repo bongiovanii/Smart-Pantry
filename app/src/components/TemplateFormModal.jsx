@@ -24,17 +24,11 @@ function TemplateFormModal({
   error = '',
 }) {
   const titleId = useId()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [selectedWeek, setSelectedWeek] = useState(weekIndex)
-
-  useEffect(() => {
-    if (!isOpen) return
-
-    setName(template?.name || '')
-    setDescription(template?.description || '')
-    setSelectedWeek(template?.weekIndex || weekIndex || 1)
-  }, [isOpen, template?.id, template?.name, template?.description, template?.weekIndex, weekIndex])
+  const [name, setName] = useState(() => template?.name || '')
+  const [description, setDescription] = useState(() => template?.description || '')
+  const [selectedWeek, setSelectedWeek] = useState(
+    () => template?.weekIndex || weekIndex || 1,
+  )
 
   useEffect(() => {
     if (!isOpen) return

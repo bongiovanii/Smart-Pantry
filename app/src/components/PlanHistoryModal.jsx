@@ -14,12 +14,12 @@ function PlanHistoryModal({ isOpen, week, onClose, onOpenRecipe }) {
 
     let isActive = true
 
-    setIsLoading(true)
-    setError('')
-
     listWeeklyPlan(week.weekStart)
       .then((entries) => {
-        if (isActive) setPlan(entries)
+        if (isActive) {
+          setPlan(entries)
+          setError('')
+        }
       })
       .catch((requestError) => {
         if (isActive) {

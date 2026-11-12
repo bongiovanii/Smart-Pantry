@@ -2,9 +2,9 @@
 
 **Data:** 12 de novembro de 2026
 
-**Versão:** 1.1
+**Versão:** 1.3
 
-**Status:** em execução; Fase 7 concluída em 12/11/2026; fases 5, 6, 8, 9, 11 e 10 planejadas.
+**Status:** em execução; Fases 7, 5 e 10 concluídas em 12/11/2026; fases 6, 8, 9 e 11 planejadas; Fase 6 (Favoritas) é a próxima.
 
 **Documentos relacionados:**
 - [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) — perguntas e respostas que orientam este plano.
@@ -450,15 +450,15 @@ create table public.meal_plan_weeks (
 
 ### 6.5 Critérios de pronto
 
-- [ ] Usuário consegue criar até 4 templates, um por semana do ciclo.
-- [ ] Nome é obrigatório; descrição é opcional.
-- [ ] Aplicar um template substitui a semana atual após confirmação.
-- [ ] Editar a semana não altera o template.
-- [ ] Renomear, duplicar e excluir funcionam com confirmação.
-- [ ] O ciclo avança a cada semana e repete os templates a cada 4 semanas.
-- [ ] O histórico preserva semanas anteriores.
-- [ ] RLS impede acesso a templates de outro usuário.
-- [ ] ESLint, build e testes passam.
+- [x] Usuário consegue criar até 4 templates, um por semana do ciclo.
+- [x] Nome é obrigatório; descrição é opcional.
+- [x] Aplicar um template substitui a semana atual após confirmação.
+- [x] Editar a semana não altera o template.
+- [x] Renomear, duplicar e excluir funcionam com confirmação.
+- [x] O ciclo avança a cada semana e repete os templates a cada 4 semanas.
+- [x] O histórico preserva semanas anteriores.
+- [x] RLS impede acesso a templates de outro usuário.
+- [x] ESLint, build e testes passam.
 
 ### 6.6 Riscos
 
@@ -882,12 +882,12 @@ desperdício dele fazendo uma receita? Eu posso te sugerir uma!
 
 ### 11.6 Critérios de pronto
 
-- [ ] Itens a até 7 dias do vencimento geram aviso in-app.
-- [ ] Itens vencidos também são sinalizados.
-- [ ] Um aviso por item por dia; adiar e dispensar funcionam.
-- [ ] Clique abre o chat com o texto preenchido.
-- [ ] Toggle nas configurações desativa a geração.
-- [ ] RLS e testes passam.
+- [x] Itens a até 7 dias do vencimento geram aviso in-app.
+- [x] Itens vencidos também são sinalizados.
+- [x] Um aviso por item por dia; adiar e dispensar funcionam.
+- [x] Clique abre o fluxo de receitas sugeridas para evitar o desperdício (e futuro Smart Chef).
+- [x] Toggle nas configurações desativa a geração.
+- [x] RLS e testes passam.
 
 ---
 
@@ -987,7 +987,9 @@ Uma fase só é considerada concluída quando:
 2. ~~Atualizar `docs/ESTADO_ATUAL_DO_PROJETO.md` para a versão 2.0~~ (concluído; a versão 2.1 registra a Fase 7).
 3. ~~Iniciar a **Fase 7**: migração `recipes` + `recipe_generations`, RPCs, Edge Function cache-first e modal “Descobrir mais receitas”~~ (concluída em 12/11/2026).
 4. ~~Registrar o incremento em `docs/ESCOPO_INCREMENTO_5.md`~~ (concluído).
-5. Iniciar a **Fase 5 — Templates de planejamento**.
+5. ~~Implementar a **Fase 5 — Templates de planejamento**: ciclo de 4 semanas, até 4 templates, RPCs transacionais, página `PlanningPage.jsx` completa, modais e histórico~~ (concluída em 12/11/2026).
+6. ~~Registrar o incremento em `docs/ESCOPO_INCREMENTO_6.md`~~ (concluído).
+7. Iniciar a **Fase 6 — Favoritas**: botão favorito, persistência e abas em “Minhas receitas”.
 
 ---
 
@@ -997,3 +999,4 @@ Uma fase só é considerada concluída quando:
 |---|---|---|
 | 1.0 | 12/11/2026 | Criação do plano v3 com as fases 7 → 5 → 6 → 8 → 9 → 11 → 10, modelo de dados, RPCs, critérios de pronto e riscos. |
 | 1.1 | 12/11/2026 | Fase 7 registrada como concluída; próximos passos atualizados para a Fase 5. |
+| 1.2 | 12/11/2026 | Fase 5 registrada como concluída com templates, ciclo de 4 semanas e histórico; próximos passos atualizados para a Fase 6 (Favoritas). |

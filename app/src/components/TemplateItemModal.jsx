@@ -27,16 +27,6 @@ function TemplateItemModal({
   useEffect(() => {
     if (!isOpen) return
 
-    setMealType(MEAL_TYPES[0])
-    setSearch('')
-    setCategory('')
-    setSelectedRecipe(null)
-    setLoadError('')
-  }, [isOpen, dayOfWeek])
-
-  useEffect(() => {
-    if (!isOpen) return
-
     function handleKeyDown(event) {
       if (event.key === 'Escape' && !isSubmitting) onClose()
     }

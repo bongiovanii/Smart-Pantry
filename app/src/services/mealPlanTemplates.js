@@ -210,6 +210,10 @@ export async function deleteTemplate(id) {
 }
 
 export async function duplicateTemplate(id) {
+  if (!id) {
+    throw new Error('Template não informado.')
+  }
+
   const { data, error } = await supabase.rpc(
     'duplicate_meal_plan_template',
     { p_template_id: id },
@@ -243,6 +247,10 @@ export async function saveCurrentWeekAsTemplate({ name, description }) {
 }
 
 export async function applyTemplate(id) {
+  if (!id) {
+    throw new Error('Template não informado.')
+  }
+
   const { data, error } = await supabase.rpc('apply_meal_plan_template', {
     p_template_id: id,
   })

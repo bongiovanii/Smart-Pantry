@@ -1,5 +1,6 @@
 import { getCurrentSession } from '../lib/session.js'
 import { supabase } from '../lib/supabase.js'
+import { toDateOnly } from '../lib/week.js'
 
 const pantryFields =
   'id, name, category, quantity, unit, expiration_date, created_at, updated_at'
@@ -21,6 +22,10 @@ export async function listPantryItems() {
 
 export async function createPantryItem(item) {
   const session = await getCurrentSession()
+
+  if (item.expirationDate && item.expirationDate < toDateOnly()) {
+    throw new Error('A data de validade não pode ser anterior a hoje.')
+  }
 
   const { data, error } = await supabase
     .from('pantry_items')

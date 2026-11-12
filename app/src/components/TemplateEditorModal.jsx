@@ -28,14 +28,12 @@ function TemplateEditorModal({
 
     let isActive = true
 
-    setIsLoading(true)
-    setLoadError('')
-    setActionError('')
-    setNotice('')
-
     listTemplateItems(template.id)
       .then((result) => {
-        if (isActive) setItems(result)
+        if (isActive) {
+          setItems(result)
+          setLoadError('')
+        }
       })
       .catch((error) => {
         if (isActive) {

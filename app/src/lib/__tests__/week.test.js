@@ -34,7 +34,8 @@ describe('getMonday', () => {
   })
 
   it('considera a virada do dia no fuso de Brasília', () => {
-    expect(getMonday(new Date('2026-11-16T01:00:00Z'))).toBe('2026-11-16')
+    // 04:00 UTC de 16/11 é 01:00 da segunda-feira em Brasília.
+    expect(getMonday(new Date('2026-11-16T04:00:00Z'))).toBe('2026-11-16')
   })
 })
 
