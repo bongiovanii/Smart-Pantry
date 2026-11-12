@@ -745,7 +745,11 @@ function buildRecipeSchema() {
 }
 
 // Monta o corpo da requisição para o endpoint generateContent do Gemini.
-function buildGeminiRequest(ingredients: string[], limit: number) {
+function buildGeminiRequest(
+  ingredients: string[],
+  limit: number,
+  avoidTitles: string[] = [],
+) {
   const systemInstruction = `Você é um chef especialista em culinária caseira brasileira e combate ao desperdício de alimentos.
 Suas receitas são práticas, saborosas, nutritivas e aproveitam ao máximo os ingredientes disponíveis.
 REGRAS OBRIGATÓRIAS:
@@ -758,8 +762,12 @@ REGRAS OBRIGATÓRIAS:
 - Para cada receita, informe imageQuery com o nome popular do prato em 2 a 5 palavras (ex.: "feijoada", "pão de queijo", "arroz carreteiro"), para busca de foto real.
 - Estime as calorias por porção (caloriesPerServing) em kcal, de forma coerente com os ingredientes e as quantidades informadas. Use um número inteiro e não invente precisão nutricional.`
 
-  const userPrompt = `Ingredientes disponíveis na minha dispensa: ${ingredients.join(', ')}.
+  const avoidClause =
+    avoidTitles.length > 0
+      ? `\nIMPORTANTE: O usuário já possui as seguintes receitas salvas: ${avoidTitles.slice(0, 15).join(', ')}. Não repita esses pratos; sugira opções inéditas e variadas.\n`
+      : ''
 
+  const userPrompt = `Ingredientes disponíveis na minha dispensa: ${ingredients.join(', ')}.${avoidClause}
 Sugira até ${limit} receitas variadas que aproveitem esses ingredientes ao máximo.
 Priorize receitas que usem a maior parte dos ingredientes listados.
 Para cada receita, forneça: nome, imageQuery do prato, categoria, tempo de preparo, porções, calorias estimadas por porção, ingredientes que já tenho, ingredientes que faltam comprar e o modo de preparo passo a passo.`
@@ -1259,6 +1267,7 @@ Deno.serve(async (request) => {
     // Normaliza e valida a lista de ingredientes enviada pelo frontend.
     const ingredients = normalizeIngredients(body?.ingredients)
     const limit = normalizeLimit(body?.limit)
+    const forceAi = Boolean(body?.forceAi)
 
     // Uma consulta sem ingredientes não teria utilidade para o usuário.
     if (ingredients.length === 0) {
@@ -1298,8 +1307,8 @@ Deno.serve(async (request) => {
       DAILY_GENERATION_LIMIT - generationsToday,
     )
 
-    // A biblioteca já cobre a quantidade pedida: nenhum token é gasto.
-    if (cachedRecipes.length >= limit) {
+    // Se forceAi não foi solicitado e a biblioteca já cobre a quantidade pedida: nenhum token é gasto.
+    if (!forceAi && cachedRecipes.length >= limit) {
       return jsonResponse({
         recipes: cachedRecipes,
         source: 'cache',
@@ -1344,9 +1353,17 @@ Deno.serve(async (request) => {
       )
     }
 
-    // 2. Gera apenas a diferença que a biblioteca não cobriu.
-    const missingCount = limit - cachedRecipes.length
-    const geminiRequest = buildGeminiRequest(ingredients, missingCount)
+    // 2. Se forceAi for true, gera `limit` receitas inéditas pelo Gemini evitando pratos já salvos.
+    // Se forceAi for false, gera apenas a diferença que a biblioteca não cobriu.
+    const missingCount = forceAi ? limit : limit - cachedRecipes.length
+    const existingTitles = cachedRows
+      .map((r: any) => String(r.title ?? ''))
+      .filter(Boolean)
+    const geminiRequest = buildGeminiRequest(
+      ingredients,
+      missingCount,
+      existingTitles,
+    )
 
     // Tenta o modelo principal e, em caso de sobrecarga ou indisponibilidade,
     // tenta os modelos de fallback antes de devolver erro ao aplicativo.
@@ -1483,25 +1500,24 @@ Deno.serve(async (request) => {
         ? persistedRecipes.map((row) => mapStoredRecipe(row, 'ai'))
         : enrichedRecipes.map((recipe) => ({ ...recipe, origin: 'ai' }))
 
-    const combinedRecipes = mergeRecipeLists(
-      cachedRecipes,
-      generatedRecipes,
-    ).slice(0, limit)
+    const combinedRecipes = forceAi
+      ? generatedRecipes.slice(0, limit)
+      : mergeRecipeLists(cachedRecipes, generatedRecipes).slice(0, limit)
 
     await recordGeneration(user, {
       requestedCount: limit,
       generatedCount: generatedRecipes.length,
-      cacheHits: cachedRecipes.length,
-      source: cachedRecipes.length > 0 ? 'mixed' : 'ai',
+      cacheHits: forceAi ? 0 : cachedRecipes.length,
+      source: forceAi ? 'ai' : cachedRecipes.length > 0 ? 'mixed' : 'ai',
     })
 
     return jsonResponse({
       recipes: combinedRecipes,
-      source: cachedRecipes.length > 0 ? 'mixed' : 'ai',
-      cacheHits: cachedRecipes.length,
+      source: forceAi ? 'ai' : cachedRecipes.length > 0 ? 'mixed' : 'ai',
+      cacheHits: forceAi ? 0 : cachedRecipes.length,
       generated: generatedRecipes.length,
       remainingGenerationsToday: Math.max(0, remainingGenerationsToday - 1),
-      limitReached: false,
+      limitReached: Math.max(0, remainingGenerationsToday - 1) <= 0,
     })
   } catch (error) {
     // Erros de JSON, rede ou programação são registrados apenas no servidor.

@@ -554,6 +554,10 @@ function App({ user, onSignOut }) {
   function handleNavigate(view, sectionId) {
     setActiveView(view)
 
+    if (view === 'despensa') {
+      loadIngredients().catch(() => {})
+    }
+
     // Aguarda a troca de tela antes de posicionar a rolagem.
     window.setTimeout(() => {
       if (sectionId && view === 'despensa') {
@@ -790,6 +794,44 @@ function App({ user, onSignOut }) {
     return favoriteTitles.has(normalizeRecipeTitle(recipe.title))
   }
 
+  async function handleGenerateAiRecipes() {
+    if (ingredients.length === 0) {
+      setNotice(
+        'Cadastre pelo menos um ingrediente na despensa para gerar receitas.',
+      )
+      return
+    }
+
+    setIsRecipesLoading(true)
+    setRecipeError('')
+
+    try {
+      const result = await listRecipesByIngredients(ingredients, {
+        limit: 6,
+        forceAi: true,
+      })
+
+      if (result.recipes?.length) {
+        setRecipes((current) => mergeRecipeLists(result.recipes, current))
+      }
+      setRecipeMeta(result)
+
+      if (result.limitReached) {
+        setNotice(
+          'Você atingiu o limite de 10 gerações diárias com IA. Mostrando suas receitas salvas.',
+        )
+      } else {
+        setNotice(
+          `${result.generated} nova${result.generated === 1 ? '' : 's'} receita${result.generated === 1 ? '' : 's'} gerada${result.generated === 1 ? '' : 's'} com IA!`,
+        )
+      }
+    } catch (error) {
+      setRecipeError(error.message || 'Não foi possível gerar novas receitas.')
+    } finally {
+      setIsRecipesLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-background text-on-background">
       <Sidebar
@@ -839,6 +881,7 @@ function App({ user, onSignOut }) {
             <ShoppingListPage
               onGoToPantry={() => handleNavigate('despensa', 'despensa')}
               onNotice={(msg) => setNotice(msg)}
+              onPantryUpdated={loadIngredients}
               pantryItems={ingredients}
               weeklyPlan={weeklyPlan}
             />
@@ -1007,6 +1050,32 @@ function App({ user, onSignOut }) {
                 </h2>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  className="flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:pointer-events-none disabled:opacity-50"
+                  disabled={
+                    isRecipesLoading ||
+                    ingredients.length === 0 ||
+                    (recipeMeta?.remainingGenerationsToday !== null &&
+                      recipeMeta?.remainingGenerationsToday !== undefined &&
+                      recipeMeta?.remainingGenerationsToday <= 0)
+                  }
+                  onClick={handleGenerateAiRecipes}
+                  title="Gerar novas sugestões de receitas com IA mesmo que já existam receitas salvas"
+                  type="button"
+                >
+                  <span
+                    className={`material-symbols-outlined text-base ${isRecipesLoading ? 'animate-spin' : ''}`}
+                  >
+                    {isRecipesLoading ? 'progress_activity' : 'auto_awesome'}
+                  </span>
+                  Gerar novas com IA
+                  {recipeMeta?.remainingGenerationsToday !== null &&
+                    recipeMeta?.remainingGenerationsToday !== undefined && (
+                      <span className="text-[10px] font-semibold opacity-85">
+                        ({recipeMeta.remainingGenerationsToday}/10)
+                      </span>
+                    )}
+                </button>
                 {recipeMeta?.source === 'cache' && (
                   <span className="rounded-full bg-secondary-container px-3 py-1 text-xs font-semibold text-primary">
                     Da sua biblioteca

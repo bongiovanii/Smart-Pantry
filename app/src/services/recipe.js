@@ -148,6 +148,7 @@ export async function listRecipesByIngredients(ingredients, options = {}) {
       body: {
         ingredients: ingredientNames,
         limit,
+        forceAi: Boolean(options.forceAi),
       },
     },
   )

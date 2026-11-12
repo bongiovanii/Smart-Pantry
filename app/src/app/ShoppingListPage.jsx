@@ -17,6 +17,7 @@ function ShoppingListPage({
   pantryItems = [],
   onGoToPantry,
   onNotice,
+  onPantryUpdated,
 }) {
   const [items, setItems] = useState([])
   const [purchasedItems, setPurchasedItems] = useState([])
@@ -212,6 +213,10 @@ function ShoppingListPage({
       setItems((curr) => curr.filter((i) => i.id !== purchasingItem.id))
       setPurchasedItems((curr) => [updated, ...curr])
       setPurchasingItem(null)
+
+      if (options.addToPantry) {
+        await onPantryUpdated?.()
+      }
 
       onNotice?.(
         options.addToPantry

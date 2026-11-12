@@ -182,7 +182,10 @@ function DiscoverRecipesModal({
     setNotice('')
 
     try {
-      const result = await listRecipesByIngredients(pantryItems, { limit: 6 })
+      const result = await listRecipesByIngredients(pantryItems, {
+        limit: 6,
+        forceAi: true,
+      })
 
       onRecipesGenerated?.(result.recipes, result)
 
