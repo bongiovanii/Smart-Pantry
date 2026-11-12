@@ -1,4 +1,8 @@
 import { useEffect, useId, useState } from 'react'
+import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
 import { DAY_LABELS, MEAL_TYPES } from '../lib/mealPlan.js'
 import {
   listRecipeCategories,
@@ -256,19 +260,12 @@ function TemplateItemModal({
                         onClick={() => setSelectedRecipe(recipe)}
                         type="button"
                       >
-                        {recipe.image ? (
-                          <img
-                            alt={recipe.title}
-                            className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                            src={recipe.image}
-                          />
-                        ) : (
-                          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-container text-outline">
-                            <span className="material-symbols-outlined">
-                              restaurant
-                            </span>
-                          </span>
-                        )}
+                        <img
+                          alt={recipe.title}
+                          className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                          onError={handleRecipeImageError}
+                          src={recipe.image || DEFAULT_RECIPE_IMAGE}
+                        />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-bold text-on-surface">
                             {recipe.title}

@@ -1,4 +1,8 @@
 import FavoriteButton from './FavoriteButton.jsx'
+import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
 
 function FeatureCard({
   title,
@@ -41,14 +45,17 @@ function FeatureCard({
       <div className="relative aspect-video overflow-hidden bg-surface-container-high">
         <img
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          src={image}
+          src={image || DEFAULT_RECIPE_IMAGE}
           alt={title}
+          onError={handleRecipeImageError}
         />
-        {imageSource === 'wikimedia-commons' && (
-          <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur">
-            Foto: Wikimedia Commons
-          </span>
-        )}
+        {imageSource === 'wikimedia-commons' &&
+          image &&
+          image !== DEFAULT_RECIPE_IMAGE && (
+            <span className="absolute bottom-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white backdrop-blur">
+              Foto: Wikimedia Commons
+            </span>
+          )}
         {caloriesPerServing > 0 && (
           <span className="absolute bottom-2 right-2 flex items-center gap-0.5 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-primary shadow-sm backdrop-blur">
             <span className="material-symbols-outlined text-sm">

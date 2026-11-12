@@ -1,5 +1,9 @@
 import { useEffect, useId } from 'react'
 import FavoriteButton from './FavoriteButton.jsx'
+import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
 
 // Com a migração para o Gemini, os passos de preparo (steps), tempo e porções
 // chegam embutidos no objeto recipe retornado pela Edge Function.
@@ -60,7 +64,8 @@ function RecipeDetailModal({
           <img
             alt={recipe.title}
             className="h-full w-full object-cover"
-            src={recipe.image}
+            src={recipe.image || DEFAULT_RECIPE_IMAGE}
+            onError={handleRecipeImageError}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           <div className="absolute right-3 top-3 flex items-center gap-2">
@@ -94,7 +99,10 @@ function RecipeDetailModal({
 
         {/* Corpo com Rolagem */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-          {(recipe.imageSource === 'wikimedia-commons' || recipe.imageSourceUrl) && (
+          {(recipe.imageSource === 'wikimedia-commons' ||
+            recipe.imageSourceUrl) &&
+            recipe.image &&
+            recipe.image !== DEFAULT_RECIPE_IMAGE && (
             <p className="mb-4 text-[11px] leading-4 text-on-surface-variant">
               Foto: {recipe.imageAuthor || 'Wikimedia Commons'}
               {recipe.imageLicense ? ` · ${recipe.imageLicense}` : ''}

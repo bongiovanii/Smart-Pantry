@@ -1,3 +1,5 @@
+import { DEFAULT_RECIPE_IMAGE } from './recipeRecord.js'
+
 /**
  * Monta o snapshot de uma receita para persistência.
  *
@@ -10,7 +12,7 @@ export function buildRecipeSnapshot(recipe, fallbackId = '', fallbackTitle = '')
   return {
     id: recipe?.id || fallbackId || '',
     title: String(recipe?.title ?? fallbackTitle ?? '').trim(),
-    image: recipe?.image || '',
+    image: recipe?.image || DEFAULT_RECIPE_IMAGE,
     category: recipe?.category || '',
     readyInMinutes: recipe?.readyInMinutes ?? 0,
     servings: recipe?.servings ?? 0,
@@ -47,7 +49,7 @@ export function normalizeRecipeSnapshot(snapshot, fallback = {}) {
     ...safeSnapshot,
     id: safeSnapshot.id || fallback.id || '',
     title: safeSnapshot.title || fallback.title || 'Receita sem nome',
-    image: safeSnapshot.image || fallback.image || '',
+    image: safeSnapshot.image || fallback.image || DEFAULT_RECIPE_IMAGE,
     category: safeSnapshot.category || 'outros',
     readyInMinutes,
     servings: Number(safeSnapshot.servings ?? 0),

@@ -1,5 +1,9 @@
 import { useEffect, useId, useState } from 'react'
 import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
+import {
   getRecipeGenerationStatus,
   listRecipeLibrary,
 } from '../services/recipeLibrary.js'
@@ -14,19 +18,12 @@ function LibraryCard({ recipe, onOpen, onPlan }) {
         onClick={() => onOpen(recipe)}
         type="button"
       >
-        {recipe.image ? (
-          <img
-            alt={recipe.title}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            src={recipe.image}
-          />
-        ) : (
-          <span className="grid h-full place-items-center text-outline">
-            <span className="material-symbols-outlined text-5xl">
-              restaurant
-            </span>
-          </span>
-        )}
+        <img
+          alt={recipe.title}
+          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+          onError={handleRecipeImageError}
+          src={recipe.image || DEFAULT_RECIPE_IMAGE}
+        />
         {recipe.origin === 'ai' && (
           <span className="absolute left-2 top-2 rounded-full bg-primary/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur">
             Gerada agora

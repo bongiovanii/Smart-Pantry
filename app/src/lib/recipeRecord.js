@@ -1,4 +1,20 @@
+import defaultRecipeImage from '../styles/cozinha-regional-brasileira-6016550f-1920w.webp'
 import { normalizeRecipeTitle } from './recipeNormalization.js'
+
+export const DEFAULT_RECIPE_IMAGE = defaultRecipeImage
+
+export function getRecipeImage(image) {
+  return image && String(image).trim() ? image : DEFAULT_RECIPE_IMAGE
+}
+
+export function handleRecipeImageError(event) {
+  if (
+    event?.currentTarget &&
+    event.currentTarget.src !== DEFAULT_RECIPE_IMAGE
+  ) {
+    event.currentTarget.src = DEFAULT_RECIPE_IMAGE
+  }
+}
 
 function normalizeIngredientList(value) {
   return Array.isArray(value) ? value : []
@@ -18,7 +34,7 @@ export function normalizeRecipeFromApi(recipe) {
   return {
     id: recipe?.id,
     title: recipe?.title || 'Receita sem nome',
-    image: recipe?.image || '',
+    image: getRecipeImage(recipe?.image),
     category: recipe?.category || 'outros',
     readyInMinutes,
     servings,
@@ -59,7 +75,7 @@ export function normalizeRecipeFromRow(row, origin = 'library') {
   return {
     id: row?.id,
     title: row?.title || 'Receita sem nome',
-    image: row?.image || '',
+    image: getRecipeImage(row?.image),
     category: row?.category || 'outros',
     readyInMinutes,
     servings,

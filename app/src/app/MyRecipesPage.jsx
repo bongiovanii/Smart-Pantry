@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import FavoriteButton from '../components/FavoriteButton.jsx'
+import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
 import { normalizeRecipeTitle } from '../lib/recipeNormalization.js'
 import { listFavoriteRecipes } from '../services/recipeLibrary.js'
 import { listCookedRecipes } from '../services/userRecipes.js'
@@ -480,19 +484,12 @@ function MyRecipesPage({
                   key={recipe.id || recipe.title}
                 >
                   <div className="relative aspect-video overflow-hidden bg-surface-container-high">
-                    {recipe.image ? (
-                      <img
-                        alt={recipe.title}
-                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                        src={recipe.image}
-                      />
-                    ) : (
-                      <div className="grid h-full place-items-center text-outline">
-                        <span className="material-symbols-outlined text-5xl">
-                          restaurant
-                        </span>
-                      </div>
-                    )}
+                    <img
+                      alt={recipe.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      onError={handleRecipeImageError}
+                      src={recipe.image || DEFAULT_RECIPE_IMAGE}
+                    />
 
                     <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-bold text-primary shadow-sm backdrop-blur">
                       Preparada {recipe.timesCooked}x
@@ -695,19 +692,12 @@ function MyRecipesPage({
                     key={recipe.id || recipe.title}
                   >
                     <div className="relative aspect-video overflow-hidden bg-surface-container-high">
-                      {recipe.image ? (
-                        <img
-                          alt={recipe.title}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                          src={recipe.image}
-                        />
-                      ) : (
-                        <div className="grid h-full place-items-center text-outline">
-                          <span className="material-symbols-outlined text-5xl">
-                            restaurant
-                          </span>
-                        </div>
-                      )}
+                      <img
+                        alt={recipe.title}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        onError={handleRecipeImageError}
+                        src={recipe.image || DEFAULT_RECIPE_IMAGE}
+                      />
 
                       <FavoriteButton
                         className="absolute right-2 top-2"

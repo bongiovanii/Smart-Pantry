@@ -1,4 +1,8 @@
 import { useEffect, useId, useState } from 'react'
+import {
+  DEFAULT_RECIPE_IMAGE,
+  handleRecipeImageError,
+} from '../lib/recipeRecord.js'
 import { DAY_LABELS, MEAL_TYPES, WEEK_DAYS } from '../lib/mealPlan.js'
 
 function PlanMealModal({
@@ -96,17 +100,12 @@ function PlanMealModal({
           {/* Receita escolhida */}
           {recipe ? (
             <div className="flex items-center gap-3 rounded-xl border border-outline-variant bg-surface-container-low/60 p-3">
-              {recipe.image ? (
-                <img
-                  alt={recipe.title}
-                  className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                  src={recipe.image}
-                />
-              ) : (
-                <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg bg-surface-container text-outline">
-                  <span className="material-symbols-outlined">restaurant</span>
-                </span>
-              )}
+              <img
+                alt={recipe.title}
+                className="h-14 w-14 shrink-0 rounded-lg object-cover"
+                onError={handleRecipeImageError}
+                src={recipe.image || DEFAULT_RECIPE_IMAGE}
+              />
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-on-surface">
                   {recipe.title}

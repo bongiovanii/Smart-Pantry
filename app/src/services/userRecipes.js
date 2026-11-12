@@ -1,3 +1,4 @@
+import { DEFAULT_RECIPE_IMAGE } from '../lib/recipeRecord.js'
 import { getCurrentSession } from '../lib/session.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -32,7 +33,7 @@ function normalizeCookedRecipe(row) {
     historyId: row.id,
     id: row.recipe_id,
     title: row.title || 'Receita sem nome',
-    image: row.image || '',
+    image: row.image || DEFAULT_RECIPE_IMAGE,
     category: row.category || 'outros',
     readyInMinutes: Number(row.ready_in_minutes ?? 0),
     servings: Number(row.servings ?? 0),
