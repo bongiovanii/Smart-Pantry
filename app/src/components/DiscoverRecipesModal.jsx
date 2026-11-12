@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react'
+import PantryLoadingState from './PantryLoadingState.jsx'
 import {
   DEFAULT_RECIPE_IMAGE,
   handleRecipeImageError,
@@ -283,9 +284,17 @@ function DiscoverRecipesModal({
                 onClick={handleGenerateMore}
                 type="button"
               >
-                <span className="material-symbols-outlined text-xl">
-                  {isGenerating ? 'progress_activity' : 'auto_awesome'}
-                </span>
+                {isGenerating ? (
+                  <img
+                    src="/logo-icon-smart-pantry.png"
+                    alt=""
+                    className="h-5 w-5 animate-pulse object-contain"
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-xl">
+                    auto_awesome
+                  </span>
+                )}
                 {isGenerating ? 'Gerando...' : 'Gerar mais receitas'}
               </button>
             </div>
@@ -322,20 +331,22 @@ function DiscoverRecipesModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          {isGenerating && (
+            <div className="mb-4 rounded-2xl border border-secondary-container bg-secondary-container/40 p-4">
+              <PantryLoadingState
+                message="Gerando novas receitas com inteligência artificial..."
+                size="sm"
+                submessage="Combinando os ingredientes da sua despensa com técnicas culinárias sustentáveis"
+              />
+            </div>
+          )}
+
           {isLoading && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {[0, 1, 2].map((item) => (
-                <article
-                  className="surface-card min-h-64 overflow-hidden"
-                  key={item}
-                >
-                  <div className="aspect-video bg-surface-container-low" />
-                  <div className="space-y-3 p-4" aria-hidden="true">
-                    <div className="h-4 w-3/4 rounded bg-surface-container" />
-                    <div className="h-3 w-1/2 rounded bg-surface-container" />
-                  </div>
-                </article>
-              ))}
+            <div className="py-16">
+              <PantryLoadingState
+                message="Carregando sua biblioteca de receitas..."
+                submessage="Acessando receitas salvas e compatíveis"
+              />
             </div>
           )}
 

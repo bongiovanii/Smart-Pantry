@@ -50,9 +50,11 @@ function AppHeader({
     <header className="sticky top-0 z-30 border-b border-outline-variant bg-white/95 backdrop-blur">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:h-20 lg:px-12">
         <div className="flex items-center gap-3">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-white lg:hidden">
-            <span className="material-symbols-outlined text-xl">kitchen</span>
-          </div>
+          <img
+            src="/logo-icon-smart-pantry.png"
+            alt="Smart Pantry"
+            className="h-9 w-9 object-contain lg:hidden"
+          />
           <div>
             <p className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-on-surface-variant sm:block">
               Smart Pantry

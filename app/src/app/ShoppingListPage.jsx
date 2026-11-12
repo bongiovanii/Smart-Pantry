@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import PantryLoadingState from '../components/PantryLoadingState.jsx'
 import PurchaseItemModal from '../components/PurchaseItemModal.jsx'
 import ShoppingItemModal from '../components/ShoppingItemModal.jsx'
 import { formatQuantity } from '../lib/format.js'
@@ -505,11 +506,11 @@ function ShoppingListPage({
         </div>
 
         {isLoading && (
-          <div className="py-12 text-center text-on-surface-variant">
-            <span className="material-symbols-outlined animate-spin text-3xl text-primary">
-              progress_activity
-            </span>
-            <p className="mt-2 text-xs">Carregando sua lista de compras...</p>
+          <div className="py-12">
+            <PantryLoadingState
+              message="Carregando sua lista de compras..."
+              submessage="Sincronizando ingredientes que faltam no seu plano semanal"
+            />
           </div>
         )}
 

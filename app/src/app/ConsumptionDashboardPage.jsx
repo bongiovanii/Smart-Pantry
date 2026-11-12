@@ -4,6 +4,7 @@ import CategoryDonutChart from '../components/dashboard/CategoryDonutChart.jsx'
 import DashboardKpiCard from '../components/dashboard/DashboardKpiCard.jsx'
 import EcoImpactCard from '../components/dashboard/EcoImpactCard.jsx'
 import WasteHistoryChart from '../components/dashboard/WasteHistoryChart.jsx'
+import PantryLoadingState from '../components/PantryLoadingState.jsx'
 import { getConsumptionDashboardData } from '../services/consumptionDashboard.js'
 
 export default function ConsumptionDashboardPage({
@@ -113,14 +114,10 @@ export default function ConsumptionDashboardPage({
       {/* Estados de carregamento e erro */}
       {isLoading && !data && (
         <div className="flex items-center justify-center py-20">
-          <div className="flex flex-col items-center gap-3">
-            <span className="material-symbols-outlined animate-spin text-4xl text-primary">
-              progress_activity
-            </span>
-            <span className="text-xs font-semibold text-on-surface-variant">
-              Calculando métricas da sua despensa...
-            </span>
-          </div>
+          <PantryLoadingState
+            message="Calculando métricas da sua despensa..."
+            submessage="Mapeando histórico de consumo e impacto ambiental"
+          />
         </div>
       )}
 

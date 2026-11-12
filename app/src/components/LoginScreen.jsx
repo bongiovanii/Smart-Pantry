@@ -29,9 +29,11 @@ function LoginScreen({ mode = 'login', onBack, onGoogle, isLoading, error }) {
       <header className="border-b border-outline-variant bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-20 lg:px-8">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-white">
-              <span className="material-symbols-outlined text-xl">kitchen</span>
-            </div>
+            <img
+              src="/logo-icon-smart-pantry.png"
+              alt="Smart Pantry"
+              className="h-10 w-10 object-contain"
+            />
             <div>
               <p className="text-base font-bold leading-5 text-primary">
                 Smart Pantry
@@ -92,9 +94,11 @@ function LoginScreen({ mode = 'login', onBack, onGoogle, isLoading, error }) {
               type="button"
             >
               {isLoading ? (
-                <span className="material-symbols-outlined animate-spin text-xl text-primary">
-                  progress_activity
-                </span>
+                <img
+                  src="/logo-icon-smart-pantry.png"
+                  alt=""
+                  className="h-5 w-5 animate-pulse object-contain"
+                />
               ) : (
                 <GoogleIcon />
               )}

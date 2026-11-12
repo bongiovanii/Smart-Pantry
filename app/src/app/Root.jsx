@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import LandingPage from '../components/LandingPage.jsx'
 import LoginScreen from '../components/LoginScreen.jsx'
+import PantryLoadingState from '../components/PantryLoadingState.jsx'
 import {
   getSession,
   onAuthStateChange,
@@ -37,16 +38,11 @@ function readOAuthError() {
 
 function LoadingScreen() {
   return (
-    <div className="grid min-h-dvh place-items-center bg-background text-on-background">
-      <div className="flex flex-col items-center gap-3">
-        <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary text-white">
-          <span className="material-symbols-outlined text-2xl">kitchen</span>
-        </div>
-        <p className="text-sm font-semibold text-on-surface-variant">
-          Carregando o Smart Pantry...
-        </p>
-      </div>
-    </div>
+    <PantryLoadingState
+      message="Carregando o Smart Pantry..."
+      size="fullscreen"
+      submessage="Sincronizando despensa e receitas sustentáveis"
+    />
   )
 }
 

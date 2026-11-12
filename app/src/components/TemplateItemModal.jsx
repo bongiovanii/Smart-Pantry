@@ -215,9 +215,11 @@ function TemplateItemModal({
           <div className="mt-4 max-h-80 overflow-y-auto rounded-xl border border-outline-variant">
             {isLoading && (
               <div className="flex items-center gap-3 p-4 text-sm text-on-surface-variant">
-                <span className="material-symbols-outlined animate-spin text-primary">
-                  progress_activity
-                </span>
+                <img
+                  src="/logo-icon-smart-pantry.png"
+                  alt=""
+                  className="h-5 w-5 animate-pulse object-contain"
+                />
                 Carregando receitas...
               </div>
             )}

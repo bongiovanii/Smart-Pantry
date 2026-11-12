@@ -16,6 +16,7 @@ import SettingsPage from './SettingsPage.jsx'
 import ShoppingListPage from './ShoppingListPage.jsx'
 import ConsumptionDashboardPage from './ConsumptionDashboardPage.jsx'
 import PantryDeleteModal from '../components/PantryDeleteModal.jsx'
+import PantryLoadingState from '../components/PantryLoadingState.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
@@ -962,7 +963,11 @@ function App({ user, onSignOut }) {
               <div aria-live="polite">
                 {isLoading && (
                   <div className="flex items-center gap-3 rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">
-                    <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                    <img
+                      src="/logo-icon-smart-pantry.png"
+                      alt=""
+                      className="h-6 w-6 animate-pulse object-contain"
+                    />
                     Carregando sua despensa...
                   </div>
                 )}
@@ -1096,11 +1101,17 @@ function App({ user, onSignOut }) {
                   title="Gerar novas sugestões de receitas com IA mesmo que já existam receitas salvas"
                   type="button"
                 >
-                  <span
-                    className={`material-symbols-outlined text-base ${isRecipesLoading ? 'animate-spin' : ''}`}
-                  >
-                    {isRecipesLoading ? 'progress_activity' : 'auto_awesome'}
-                  </span>
+                  {isRecipesLoading ? (
+                    <img
+                      src="/logo-icon-smart-pantry.png"
+                      alt=""
+                      className="h-4 w-4 animate-pulse object-contain"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-base">
+                      auto_awesome
+                    </span>
+                  )}
                   Gerar novas com IA
                   {recipeMeta?.remainingGenerationsToday !== null &&
                     recipeMeta?.remainingGenerationsToday !== undefined && (
@@ -1149,10 +1160,12 @@ function App({ user, onSignOut }) {
 
               {isRecipesLoading && (
                 <article className="surface-card min-h-56 overflow-hidden">
-                  <div className="grid aspect-video place-items-center bg-surface-container-low">
-                    <span className="material-symbols-outlined animate-spin text-5xl text-outline">
-                      progress_activity
-                    </span>
+                  <div className="grid aspect-video place-items-center bg-surface-container-low p-4">
+                    <PantryLoadingState
+                      size="sm"
+                      message="Buscando receitas..."
+                      submessage="Combinando os ingredientes da sua despensa"
+                    />
                   </div>
                   <div className="space-y-3 p-4" aria-hidden="true">
                     <div className="h-4 w-3/4 rounded bg-surface-container" />

@@ -320,9 +320,11 @@ function CookRecipeModal({
             >
               {isSubmitting ? (
                 <>
-                  <span className="material-symbols-outlined animate-spin text-lg">
-                    progress_activity
-                  </span>
+                  <img
+                    src="/logo-icon-smart-pantry.png"
+                    alt=""
+                    className="h-4 w-4 animate-pulse object-contain"
+                  />
                   Registrando...
                 </>
               ) : (
