@@ -154,7 +154,7 @@ Substituir a grade estática de mock da semana por um cronograma real armazenado
 > [!NOTE]
 > **Implementado em 11/11/2026.** A migração [`20261111234500_meal_plans.sql`](file:///home/gustavo-bongiovani/Documentos/GitHub/Smart-Pantry/supabase/migrations/20261111234500_meal_plans.sql) cria `meal_plans` com RLS e restrição única por `(user_id, day_of_week, meal_type)`. O snapshot completo da receita é salvo em `recipe_snapshot`, permitindo abrir o modal sem nova chamada ao Gemini. A interface ganhou `WeekPlanner.jsx`, `PlanMealModal.jsx`, botão **Planejar** no modal e atalho de calendário no card. Detalhes em [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md).
 >
-> **Pendente de deploy:** a migração foi aplicada no projeto remoto em 11/11/2026 (junto com a migração de calorias). Falta publicar o frontend atualizado.
+> **Deploy:** a migração foi aplicada no projeto remoto em 11/11/2026 (junto com a migração de calorias) e o frontend foi publicado na Vercel no mesmo dia.
 
 ---
 

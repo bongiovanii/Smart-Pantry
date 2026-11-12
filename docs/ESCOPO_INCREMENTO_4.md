@@ -1,6 +1,6 @@
 # Escopo do Incremento 4 — Planejamento semanal persistente
 
-> **Status:** implementado e com migração aplicada em 11/11/2026. Falta apenas publicar o frontend atualizado.
+> **Status:** implementado, com migração aplicada e frontend publicado em 11/11/2026.
 >
 > **Projeto:** Smart Pantry — TCC
 >
@@ -162,7 +162,7 @@ A tabela segue o mesmo modelo das demais:
 
    A mesma execução aplicou também a migração de calorias, que estava pendente desde 08/11/2026.
 
-2. Publicar o frontend atualizado (Vercel) a partir do commit correspondente.
+2. ~~Publicar o frontend atualizado (Vercel).~~ Publicado em 11/11/2026 pelo push para `main`; o bundle `App-BUKnWRSJ.js` foi confirmado na URL de produção.
 3. Validar o fluxo com uma conta autenticada:
    - planejar uma receita em um dia/refeição;
    - recarregar a página e confirmar a persistência;
@@ -170,7 +170,7 @@ A tabela segue o mesmo modelo das demais:
    - remover a refeição.
 
 > [!IMPORTANT]
-> O `supabase migration list --remote` confirmou todas as migrações sincronizadas. O smoke test via PostgREST retornou `42501` (permission denied) para `anon` em `meal_plans` e `user_recipes`, confirmando que as tabelas existem e que os grants estão corretos. O teste manual autenticado em produção depende do deploy do frontend.
+> O `supabase migration list --remote` confirmou todas as migrações sincronizadas. O smoke test via PostgREST retornou `42501` (permission denied) para `anon` em `meal_plans` e `user_recipes`, confirmando que as tabelas existem e que os grants estão corretos. O deploy do frontend foi confirmado pela presença do bundle novo em `https://smart-pantry-coral.vercel.app`. O teste manual autenticado permanece como validação final do fluxo.
 
 ---
 
@@ -181,7 +181,8 @@ A tabela segue o mesmo modelo das demais:
 - Revisão do contrato de dados entre `meal_plans`, serviço e componentes.
 - `supabase migration list --remote` confirmou as seis migrações sincronizadas.
 - Smoke test via PostgREST: `meal_plans` e `user_recipes` respondem `42501` (permission denied) para `anon`, comprovando que as tabelas existem e que o acesso público está bloqueado.
-- Teste manual autenticado pendente em produção após o deploy do frontend.
+- Deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app` (bundle `App-BUKnWRSJ.js` com o código do planejamento).
+- Teste manual autenticado permanece pendente como validação final do fluxo.
 
 ---
 

@@ -13,7 +13,7 @@
 | Versão | Data | Alteração registrada |
 |---|---|---|
 | 1.0 | 08/11/2026 | Consolidação do estado após o Incremento 3: histórico de receitas, autenticação com Google, deploy público, correção do 502 e kcal nas receitas. |
-| 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes e republicação da Edge Function. |
+| 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes, republicação da Edge Function e deploy do frontend confirmado em produção. |
 
 
 ## 1. Finalidade deste documento
@@ -393,6 +393,7 @@ Durante a implementação foram realizados os seguintes controles:
 - revisão do contrato entre `meal_plans`, `services/mealPlan.js`, `WeekPlanner` e `PlanMealModal`;
 - aplicação das migrações `20261108200000_recipe_calories.sql` e `20261111234500_meal_plans.sql` no projeto remoto, confirmada por `supabase migration list --remote`;
 - republicação da Edge Function `recipe-suggestions` em 11/11/2026, garantindo em produção o prompt com `caloriesPerServing` e o fallback entre modelos do Gemini;
+- deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app` (bundle `App-BUKnWRSJ.js` com o código do planejamento semanal);
 - smoke test via PostgREST: `meal_plans` e `user_recipes` existem e respondem `42501` (permission denied) para `anon`, confirmando tabelas presentes e grants corretos.
 
 > [!NOTE]
