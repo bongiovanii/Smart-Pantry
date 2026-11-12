@@ -835,6 +835,404 @@ function normalizeGeminiRecipe(recipe: Record<string, unknown>) {
   }
 }
 
+// ============================================================
+// Biblioteca de receitas e geração cache-first (Fase 7)
+// ============================================================
+
+const DAILY_GENERATION_LIMIT = 10
+const CACHE_MIN_OVERLAP = 2
+
+type SupabaseUserConfig = {
+  url: string
+  anonKey: string
+}
+
+type AuthenticatedUser = {
+  id: string
+  token: string
+  config: SupabaseUserConfig
+}
+
+function getSupabaseUserConfig(): SupabaseUserConfig | null {
+  const url = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+  if (!url || !anonKey) return null
+
+  return { url: url.replace(/\/$/, ''), anonKey }
+}
+
+function getBearerToken(request: Request) {
+  const header = request.headers.get('Authorization') ?? ''
+  if (!header.toLocaleLowerCase('en').startsWith('bearer ')) return ''
+  return header.slice(7).trim()
+}
+
+async function getAuthenticatedUser(
+  request: Request,
+): Promise<AuthenticatedUser | null> {
+  const config = getSupabaseUserConfig()
+  if (!config) return null
+
+  const token = getBearerToken(request)
+  if (!token) return null
+
+  try {
+    const response = await fetch(`${config.url}/auth/v1/user`, {
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) return null
+
+    const user = await response.json()
+    if (!user?.id) return null
+
+    return { id: String(user.id), token, config }
+  } catch (error) {
+    console.warn('Falha ao validar a sessão do usuário.', error)
+    return null
+  }
+}
+
+async function userRestRequest(
+  user: AuthenticatedUser,
+  path: string,
+  options: {
+    method?: string
+    body?: unknown
+    headers?: Record<string, string>
+  } = {},
+) {
+  return fetch(`${user.config.url}/rest/v1/${path}`, {
+    method: options.method ?? 'GET',
+    headers: {
+      apikey: user.config.anonKey,
+      Authorization: `Bearer ${user.token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers ?? {}),
+    },
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  })
+}
+
+async function findCachedRecipes(
+  user: AuthenticatedUser,
+  ingredients: string[],
+  limit: number,
+) {
+  try {
+    const response = await userRestRequest(
+      user,
+      'rpc/find_recipes_for_pantry',
+      {
+        method: 'POST',
+        body: { p_ingredients: ingredients, p_limit: limit },
+      },
+    )
+
+    if (!response.ok) {
+      console.warn('Não foi possível consultar o cache de receitas.', {
+        status: response.status,
+        body: await response.text(),
+      })
+      return []
+    }
+
+    const data = await response.json()
+    return Array.isArray(data) ? data : []
+  } catch (error) {
+    console.warn('Falha ao consultar o cache de receitas.', error)
+    return []
+  }
+}
+
+function getStartOfDayInBrazil() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(new Date())
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  )
+
+  return new Date(
+    `${parts.year}-${parts.month}-${parts.day}T00:00:00-03:00`,
+  )
+}
+
+async function countGenerationsToday(user: AuthenticatedUser) {
+  try {
+    const params = new URLSearchParams({
+      select: 'id',
+      user_id: `eq.${user.id}`,
+      generated_at: `gte.${getStartOfDayInBrazil().toISOString()}`,
+    })
+
+    const response = await userRestRequest(
+      user,
+      `recipe_generations?${params.toString()}`,
+    )
+
+    if (!response.ok) return 0
+
+    const rows = await response.json()
+    return Array.isArray(rows) ? rows.length : 0
+  } catch (error) {
+    console.warn('Falha ao contar as gerações do dia.', error)
+    return 0
+  }
+}
+
+async function recordGeneration(
+  user: AuthenticatedUser,
+  payload: {
+    requestedCount: number
+    generatedCount: number
+    cacheHits: number
+    source: 'ai' | 'cache' | 'mixed'
+  },
+) {
+  try {
+    const response = await userRestRequest(user, 'recipe_generations', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: [
+        {
+          user_id: user.id,
+          requested_count: payload.requestedCount,
+          generated_count: payload.generatedCount,
+          cache_hits: payload.cacheHits,
+          source: payload.source,
+        },
+      ],
+    })
+
+    if (!response.ok) {
+      console.warn('Não foi possível registrar a geração de receitas.', {
+        status: response.status,
+        body: await response.text(),
+      })
+    }
+  } catch (error) {
+    console.warn('Falha ao registrar a geração de receitas.', error)
+  }
+}
+
+function normalizeRecipeText(value: unknown) {
+  return stripAccents(String(value ?? ''))
+    .toLocaleLowerCase('pt-BR')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function singularizeIngredientWord(word: string) {
+  if (word.length <= 3) return word
+  if (word.endsWith('oes') || word.endsWith('aes')) {
+    return `${word.slice(0, -3)}ao`
+  }
+  if (word.endsWith('eis')) return `${word.slice(0, -3)}el`
+  if (word.endsWith('ais')) return `${word.slice(0, -3)}al`
+  if (word.endsWith('is')) return `${word.slice(0, -2)}il`
+  if (word.endsWith('ns')) return `${word.slice(0, -2)}m`
+  if (word.endsWith('s')) return word.slice(0, -1)
+  return word
+}
+
+function normalizeIngredientName(value: unknown) {
+  return normalizeRecipeText(value)
+    .split(' ')
+    .filter(Boolean)
+    .map(singularizeIngredientWord)
+    .join(' ')
+}
+
+function buildIngredientNames(recipe: Record<string, unknown>) {
+  const usedIngredients = Array.isArray(recipe.usedIngredients)
+    ? recipe.usedIngredients
+    : []
+
+  const names = usedIngredients
+    .map((ingredient) => {
+      if (typeof ingredient === 'string') return ingredient
+      if (ingredient && typeof ingredient === 'object') {
+        return String((ingredient as { name?: unknown }).name ?? '')
+      }
+      return ''
+    })
+    .map(normalizeIngredientName)
+    .filter(Boolean)
+
+  return [...new Set(names)]
+}
+
+function selectCacheMatches(
+  rows: Record<string, unknown>[],
+  ingredients: string[],
+  limit: number,
+) {
+  const pantryNames = new Set(ingredients.map(normalizeIngredientName))
+  const minOverlap = Math.min(CACHE_MIN_OVERLAP, pantryNames.size)
+
+  return rows
+    .filter((row) => {
+      const names = Array.isArray(row.ingredient_names)
+        ? row.ingredient_names.map(String)
+        : []
+      const overlap = names.filter((name) => pantryNames.has(name)).length
+      return overlap >= minOverlap
+    })
+    .slice(0, limit)
+}
+
+function mapStoredRecipe(row: Record<string, unknown>, origin = 'library') {
+  const usedIngredients = Array.isArray(row.used_ingredients)
+    ? row.used_ingredients
+    : []
+  const missedIngredients = Array.isArray(row.missed_ingredients)
+    ? row.missed_ingredients
+    : []
+  const steps = Array.isArray(row.steps) ? row.steps : []
+  const category =
+    typeof row.category === 'string' ? row.category : 'outros'
+  const readyInMinutes = Number(row.ready_in_minutes ?? 0)
+  const servings = Number(row.servings ?? 0)
+  const caloriesPerServing = Number(row.calories_per_serving ?? 0)
+
+  return {
+    id: String(row.id ?? ''),
+    title: String(row.title ?? 'Receita sem nome'),
+    image:
+      typeof row.image === 'string' && row.image
+        ? row.image
+        : CATEGORY_IMAGES[category] ?? CATEGORY_IMAGES.outros,
+    category,
+    readyInMinutes,
+    servings,
+    caloriesPerServing,
+    time:
+      readyInMinutes > 0
+        ? `${readyInMinutes} min`
+        : 'Tempo não informado',
+    usedIngredients,
+    missedIngredients,
+    usedIngredientCount: usedIngredients.length,
+    missedIngredientCount: missedIngredients.length,
+    ingredients: `${usedIngredients.length} ingrediente${usedIngredients.length === 1 ? '' : 's'} da despensa`,
+    steps,
+    imageQuery: String(row.image_query ?? ''),
+    imageSource: String(row.image_source ?? ''),
+    imageAuthor: String(row.image_author ?? ''),
+    imageLicense: String(row.image_license ?? ''),
+    imageLicenseUrl: String(row.image_license_url ?? ''),
+    imageSourceUrl: String(row.image_source_url ?? ''),
+    origin,
+  }
+}
+
+async function persistRecipes(
+  user: AuthenticatedUser,
+  recipes: Record<string, unknown>[],
+) {
+  if (recipes.length === 0) return []
+
+  // O upsert não pode receber o mesmo título duas vezes na mesma instrução
+  // (`ON CONFLICT DO UPDATE` afetaria a mesma linha em duplicidade). Por isso,
+  // o lote é deduplicado antes do envio, mantendo a primeira ocorrência.
+  const rowsByTitle = new Map<string, Record<string, unknown>>()
+
+  for (const recipe of recipes) {
+    const title = String(recipe.title ?? 'Receita sem nome')
+    const titleNormalized = normalizeRecipeText(title)
+
+    if (!titleNormalized || rowsByTitle.has(titleNormalized)) continue
+
+    rowsByTitle.set(titleNormalized, {
+      user_id: user.id,
+      title,
+      title_normalized: titleNormalized,
+      category: String(recipe.category ?? 'outros'),
+      image: recipe.image ? String(recipe.image) : null,
+      image_query: recipe.imageQuery ? String(recipe.imageQuery) : null,
+      image_source: recipe.imageSource ? String(recipe.imageSource) : null,
+      image_author: recipe.imageAuthor ? String(recipe.imageAuthor) : null,
+      image_license: recipe.imageLicense ? String(recipe.imageLicense) : null,
+      image_license_url: recipe.imageLicenseUrl
+        ? String(recipe.imageLicenseUrl)
+        : null,
+      image_source_url: recipe.imageSourceUrl
+        ? String(recipe.imageSourceUrl)
+        : null,
+      ready_in_minutes: Number(recipe.readyInMinutes ?? 0),
+      servings: Number(recipe.servings ?? 0),
+      calories_per_serving: Number(recipe.caloriesPerServing ?? 0),
+      used_ingredients: Array.isArray(recipe.usedIngredients)
+        ? recipe.usedIngredients
+        : [],
+      missed_ingredients: Array.isArray(recipe.missedIngredients)
+        ? recipe.missedIngredients
+        : [],
+      steps: Array.isArray(recipe.steps) ? recipe.steps : [],
+      ingredient_names: buildIngredientNames(recipe),
+    })
+  }
+
+  const rows = [...rowsByTitle.values()]
+  if (rows.length === 0) return []
+
+  const response = await userRestRequest(
+    user,
+    'recipes?on_conflict=user_id,title_normalized&select=*',
+    {
+      method: 'POST',
+      headers: {
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      body: rows,
+    },
+  )
+
+  if (!response.ok) {
+    throw new Error(
+      `Falha ao salvar receitas na biblioteca (${response.status}): ${await response.text()}`,
+    )
+  }
+
+  const savedRows = await response.json()
+  if (!Array.isArray(savedRows)) return []
+
+  const byTitle = new Map(
+    savedRows.map((row: Record<string, unknown>) => [
+      String(row.title_normalized ?? ''),
+      row,
+    ]),
+  )
+
+  return [...rowsByTitle.keys()]
+    .map((titleNormalized) => byTitle.get(titleNormalized))
+    .filter(Boolean) as Record<string, unknown>[]
+}
+
+function mergeRecipeLists(...lists: Record<string, unknown>[][]) {
+  const byTitle = new Map<string, Record<string, unknown>>()
+
+  for (const recipe of lists.flat()) {
+    const key = normalizeRecipeText(recipe.title)
+    if (key && !byTitle.has(key)) byTitle.set(key, recipe)
+  }
+
+  return [...byTitle.values()]
+}
+
 // Deno.serve cria o servidor HTTP executado pelo ambiente de Edge Functions.
 Deno.serve(async (request) => {
   // O navegador envia OPTIONS antes do POST para validar o CORS.
@@ -847,12 +1245,8 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: 'Método não permitido.' }, 405)
   }
 
-  // A chave fica armazenada nos secrets do Supabase e nunca é exposta ao cliente.
-  const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
-  const geminiModels = getGeminiModels()
-
-  if (!geminiApiKey) {
-    console.error('GEMINI_API_KEY não foi configurada nos secrets do Supabase.')
+  if (!getSupabaseUserConfig()) {
+    console.error('SUPABASE_URL ou SUPABASE_ANON_KEY não estão disponíveis.')
     return jsonResponse(
       { error: 'O serviço de receitas não está configurado.' },
       500,
@@ -874,8 +1268,85 @@ Deno.serve(async (request) => {
       )
     }
 
-    // Monta a requisição e chama o endpoint REST do Gemini.
-    const geminiRequest = buildGeminiRequest(ingredients, limit)
+    // A biblioteca é por usuário: sem sessão não há como consultar nem salvar.
+    const user = await getAuthenticatedUser(request)
+
+    if (!user) {
+      return jsonResponse(
+        { error: 'Entre com sua conta Google para consultar receitas.' },
+        401,
+      )
+    }
+
+    // 1. Cache-first: consulta a biblioteca antes de chamar o Gemini.
+    // Os nomes são normalizados para casar com `ingredient_names` no banco.
+    const normalizedIngredients = ingredients.map(normalizeIngredientName)
+    const cachedRows = await findCachedRecipes(
+      user,
+      normalizedIngredients,
+      limit,
+    )
+    const cachedRecipes = selectCacheMatches(
+      cachedRows,
+      normalizedIngredients,
+      limit,
+    ).map((row) => mapStoredRecipe(row, 'library'))
+
+    const generationsToday = await countGenerationsToday(user)
+    const remainingGenerationsToday = Math.max(
+      0,
+      DAILY_GENERATION_LIMIT - generationsToday,
+    )
+
+    // A biblioteca já cobre a quantidade pedida: nenhum token é gasto.
+    if (cachedRecipes.length >= limit) {
+      return jsonResponse({
+        recipes: cachedRecipes,
+        source: 'cache',
+        cacheHits: cachedRecipes.length,
+        generated: 0,
+        remainingGenerationsToday,
+        limitReached: false,
+      })
+    }
+
+    if (remainingGenerationsToday <= 0) {
+      // Sem cota, ainda entregamos o que a biblioteca tiver.
+      if (cachedRecipes.length > 0) {
+        return jsonResponse({
+          recipes: cachedRecipes,
+          source: 'cache',
+          cacheHits: cachedRecipes.length,
+          generated: 0,
+          remainingGenerationsToday: 0,
+          limitReached: true,
+        })
+      }
+
+      return jsonResponse(
+        {
+          error:
+            'Você atingiu o limite de 10 gerações de receitas por dia. Sua biblioteca continua disponível em “Descobrir mais receitas”.',
+          remainingGenerationsToday: 0,
+        },
+        429,
+      )
+    }
+
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
+    const geminiModels = getGeminiModels()
+
+    if (!geminiApiKey) {
+      console.error('GEMINI_API_KEY não foi configurada nos secrets do Supabase.')
+      return jsonResponse(
+        { error: 'O serviço de receitas não está configurado.' },
+        500,
+      )
+    }
+
+    // 2. Gera apenas a diferença que a biblioteca não cobriu.
+    const missingCount = limit - cachedRecipes.length
+    const geminiRequest = buildGeminiRequest(ingredients, missingCount)
 
     // Tenta o modelo principal e, em caso de sobrecarga ou indisponibilidade,
     // tenta os modelos de fallback antes de devolver erro ao aplicativo.
@@ -992,9 +1463,46 @@ Deno.serve(async (request) => {
 
     // Busca fotos reais no Wikimedia Commons e armazena no Supabase Storage.
     // Se qualquer imagem falhar, a receita mantém o fallback por categoria.
-    const recipes = await enrichRecipesWithImages(normalizedRecipes)
+    const enrichedRecipes = await enrichRecipesWithImages(normalizedRecipes)
 
-    return jsonResponse({ recipes })
+    // Persiste as receitas na biblioteca para as próximas consultas e para as
+    // fases seguintes (favoritas, planejamento, lista de compras e chat).
+    let persistedRecipes: Record<string, unknown>[] = []
+
+    try {
+      persistedRecipes = await persistRecipes(user, enrichedRecipes)
+    } catch (persistError) {
+      console.error(
+        'Não foi possível persistir as receitas geradas.',
+        persistError,
+      )
+    }
+
+    const generatedRecipes =
+      persistedRecipes.length > 0
+        ? persistedRecipes.map((row) => mapStoredRecipe(row, 'ai'))
+        : enrichedRecipes.map((recipe) => ({ ...recipe, origin: 'ai' }))
+
+    const combinedRecipes = mergeRecipeLists(
+      cachedRecipes,
+      generatedRecipes,
+    ).slice(0, limit)
+
+    await recordGeneration(user, {
+      requestedCount: limit,
+      generatedCount: generatedRecipes.length,
+      cacheHits: cachedRecipes.length,
+      source: cachedRecipes.length > 0 ? 'mixed' : 'ai',
+    })
+
+    return jsonResponse({
+      recipes: combinedRecipes,
+      source: cachedRecipes.length > 0 ? 'mixed' : 'ai',
+      cacheHits: cachedRecipes.length,
+      generated: generatedRecipes.length,
+      remainingGenerationsToday: Math.max(0, remainingGenerationsToday - 1),
+      limitReached: false,
+    })
   } catch (error) {
     // Erros de JSON, rede ou programação são registrados apenas no servidor.
     console.error('Falha inesperada em recipe-suggestions.', error)

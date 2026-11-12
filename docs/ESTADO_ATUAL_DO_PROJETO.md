@@ -2,11 +2,11 @@
 
 **Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 2.0
+**Versão do documento:** 2.1
 
-**Fase atual:** fases 1 a 4 concluídas (despensa, receitas com IA, consumo e planejamento semanal persistente). O plano v3 foi aprovado e documentado; as fases 5 a 11 estão planejadas e ainda não implementadas.
+**Fase atual:** fases 1 a 4 e Fase 7 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente, biblioteca de receitas e geração cache-first). As fases 5, 6, 8, 9, 11 e 10 estão planejadas; a Fase 5 é a próxima.
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md) — planejamento semanal persistente. O incremento anterior permanece em [`ESCOPO_INCREMENTO_3.md`](./ESCOPO_INCREMENTO_3.md).
+**Incremento documentado:** [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md) — biblioteca de receitas e geração cache-first. O incremento anterior permanece em [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md).
 
 **Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
 
@@ -18,6 +18,7 @@
 | 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes, republicação da Edge Function e deploy do frontend confirmado em produção. |
 | 1.2 | 12/11/2026 | Correção de usabilidade: o inventário da despensa passou a ter altura fixa com rolagem interna, exibindo até 4 itens antes de rolar. |
 | 2.0 | 12/11/2026 | Planejamento v3 aprovado e documentado: ordem 7 → 5 → 6 → 8 → 9 → 11 → 10, decisões de projeto, plano de testes, biblioteca de receitas com cache-first, templates de planejamento, favoritas, dark mode, lista de compras, notificações in-app e Smart Chef. Nenhuma funcionalidade do v3 foi implementada nesta versão. |
+| 2.1 | 12/11/2026 | Fase 7 implementada: tabelas `recipes` e `recipe_generations`, Edge Function cache-first com JWT, limite diário de 10 gerações, modal “Descobrir mais receitas”, normalização compartilhada e 16 testes unitários com Vitest. Migração aplicada e função publicada; validação autenticada final pendente. |
 
 
 ## 1. Finalidade deste documento
@@ -168,7 +169,7 @@ Na prática, essa decisão impede que uma sessão consulte ou modifique diretame
 
 ### 5.7 Sugestão de receitas
 
-Depois que a despensa é carregada, os nomes dos ingredientes são enviados ao serviço de receitas. O sistema faz uma única consulta combinando os ingredientes disponíveis e solicita até seis sugestões.
+Depois que a despensa é carregada, os nomes dos ingredientes são enviados ao serviço de receitas. O sistema solicita até seis sugestões e, desde a Fase 7, consulta primeiro a biblioteca do usuário antes de chamar o Gemini.
 
 Cada receita recebida é adaptada para o cartão da aplicação, contendo:
 
@@ -176,9 +177,10 @@ Cada receita recebida é adaptada para o cartão da aplicação, contendo:
 - título;
 - imagem;
 - quantidade de ingredientes da despensa aproveitados;
-- ingredientes utilizados e ingredientes faltantes retornados pelo serviço.
+- ingredientes utilizados e ingredientes faltantes;
+- tempo de preparo e calorias por porção, quando informados pelo modelo.
 
-O endpoint atual não fornece o tempo de preparo nessa mesma consulta. Por isso, o cartão apresenta **Tempo não informado** quando esse dado não existe.
+Quando a biblioteca já cobre a quantidade pedida, as receitas são devolvidas do cache sem nova chamada ao Gemini. Quando cobre apenas parte, o Gemini gera somente a diferença. O cartão apresenta **Tempo não informado** apenas quando o dado não existe.
 
 ### 5.8 Integração protegida com o Gemini API (Google AI Studio)
 
@@ -190,12 +192,15 @@ O fluxo atual é:
 
 1. o React carrega os ingredientes da despensa;
 2. `recipe.js` extrai e normaliza os nomes (mantendo o PT-BR nativo);
-3. o Supabase autentica a chamada à Edge Function;
-4. a Edge Function valida a entrada e limita o tamanho da consulta;
-5. monta o prompt com os ingredientes e um JSON Schema estrito;
-6. o Gemini gera receitas completas em PT-BR (título, categoria, tempo, porções, ingredientes usados, faltantes e passos de preparo);
-7. a Edge Function mapeia uma imagem por categoria (Unsplash) e devolve o JSON normalizado;
-8. os dados são convertidos em cartões de receita e abertos no modal de detalhes instantaneamente.
+3. o Supabase envia o JWT da sessão para a Edge Function;
+4. a Edge Function valida o usuário em `/auth/v1/user` e rejeita chamadas sem sessão com `401`;
+5. a função consulta a biblioteca do usuário pela RPC `find_recipes_for_pantry`;
+6. se o cache cobre o limite, devolve as receitas salvas sem chamar o Gemini;
+7. se o cache é parcial, verifica o limite diário e chama o Gemini apenas para a diferença;
+8. monta o prompt com os ingredientes e um JSON Schema estrito;
+9. o Gemini gera receitas completas em PT-BR (título, categoria, tempo, porções, ingredientes usados, faltantes e passos de preparo);
+10. a Edge Function busca imagens reais no Wikimedia Commons (com fallback por categoria), persiste as receitas em `recipes` e registra a geração em `recipe_generations`;
+11. os dados são convertidos em cartões de receita e abertos no modal de detalhes instantaneamente.
 
 ### 5.9 Dados embutidos na primeira resposta
 
@@ -206,11 +211,12 @@ Com o Gemini, todos os dados da receita — incluindo passos de preparo (`steps`
 A seção de receitas diferencia os seguintes estados:
 
 - consulta em andamento;
-- receitas carregadas;
+- receitas carregadas do cache, da IA ou de uma combinação dos dois;
 - nenhuma receita encontrada;
-- erro na consulta.
+- erro na consulta;
+- limite diário atingido.
 
-Também existe uma proteção contra a repetição da mesma requisição, reduzindo chamadas desnecessárias ao Gemini e preservando a cota do serviço.
+A interface exibe os selos **Da sua biblioteca** e **Limite diário atingido** conforme os metadados devolvidos pela Edge Function. Também existe uma proteção contra a repetição da mesma requisição, reduzindo chamadas desnecessárias ao Gemini e preservando a cota do serviço.
 
 ### 5.11 Consumo de receitas e movimentações de estoque
 
@@ -258,33 +264,48 @@ O prompt do chef brasileiro passou a estimar `caloriesPerServing` (kcal por por�
 
 Quando o modelo não informa o valor, o campo é armazenado como zero/nulo e a interface simplesmente o oculta.
 
-### 5.15 Planejamento v3 (fases 5 a 11) — aprovado, não implementado
+### 5.15 Planejamento v3 (fases 5 a 11) — em execução
 
-Em 12/11/2026 foi concluída a etapa de planejamento das próximas funcionalidades. Nenhuma alteração de código do v3 foi feita ainda; o que existe é a especificação aprovada.
+Em 12/11/2026 foi concluída a etapa de planejamento das próximas funcionalidades e implementada a **Fase 7**. As demais fases do v3 continuam planejadas.
 
 A ordem de execução definida é **7 → 5 → 6 → 8 → 9 → 11 → 10**, por dependência técnica:
 
-| Fase | Funcionalidade | Depende de |
-|---|---|---|
-| 7 | Biblioteca de receitas persistida + geração cache-first + “Descobrir mais receitas” | — |
-| 5 | Aba de planejamento com até 4 templates, ciclo de 4 semanas e histórico | Fase 7 |
-| 6 | Favoritas com snapshot e abas em “Minhas receitas” | Fase 7 |
-| 8 | Aba Configurações com dark mode | — |
-| 9 | Fluxo de entrada/reposição + aba “Minha lista de compras” | Fase 5 e histórico de movimentações |
-| 11 | Chatbot Smart Chef (stretch) | Fases 7 e 9 |
-| 10 | Notificações de vencimento in-app (stretch) | Fase 11 |
+| Fase | Funcionalidade | Depende de | Status |
+|---|---|---|---|
+| 7 | Biblioteca de receitas persistida + geração cache-first + “Descobrir mais receitas” | — | Implementada em 12/11/2026 |
+| 5 | Aba de planejamento com até 4 templates, ciclo de 4 semanas e histórico | Fase 7 | Planejada (próxima) |
+| 6 | Favoritas com snapshot e abas em “Minhas receitas” | Fase 7 | Planejada |
+| 8 | Aba Configurações com dark mode | — | Planejada |
+| 9 | Fluxo de entrada/reposição + aba “Minha lista de compras” | Fase 5 e histórico de movimentações | Planejada |
+| 11 | Chatbot Smart Chef (stretch) | Fases 7 e 9 | Planejada (stretch) |
+| 10 | Notificações de vencimento in-app (stretch) | Fase 11 | Planejada (stretch) |
 
 Decisões estruturais registradas:
 
-- toda receita gerada pela IA será persistida em `recipes`, com deduplicação por título normalizado;
-- a geração será **cache-first**: a Edge Function consulta a biblioteca antes de chamar o Gemini;
+- toda receita gerada pela IA é persistida em `recipes`, com deduplicação por título normalizado;
+- a geração é **cache-first**: a Edge Function consulta a biblioteca antes de chamar o Gemini;
 - o planejamento passará a ter `week_start`, ciclo de 4 semanas e histórico, mantendo a recorrência;
 - a lista de compras será derivada de `stock_movements` (consumo e entradas) e dos ingredientes faltantes do planejamento;
 - as notificações serão in-app no MVP, com evolução documentada para PWA + push + VAPID;
 - o Smart Chef terá uma conversa persistida, ações estruturadas e limite de 7 mensagens/dia;
-- a única dependência nova crítica é o **Vitest** para testes unitários.
+- a única dependência nova crítica é o **Vitest** para testes unitários, já adicionada na Fase 7.
 
-O detalhamento completo está em [`plano_implementacao_v3.md`](./plano_implementacao_v3.md).
+O detalhamento completo está em [`plano_implementacao_v3.md`](./plano_implementacao_v3.md). O registro da Fase 7 está em [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
+
+### 5.16 Biblioteca de receitas e geração cache-first (Fase 7)
+
+A Fase 7 mudou o ciclo das receitas: elas deixaram de ser efêmeras e passaram a compor uma biblioteca por usuário.
+
+- **Persistência:** toda receita gerada pela IA é salva em `recipes`, com snapshot completo (ingredientes, passos, imagem, tempo, porções e calorias) e `title_normalized` para deduplicação.
+- **Cache-first:** antes de chamar o Gemini, a Edge Function consulta `find_recipes_for_pantry` com os ingredientes normalizados da despensa. Se a biblioteca cobre o limite, nenhum token é gasto; se cobre parcialmente, o Gemini gera apenas a diferença.
+- **Deduplicação:** a restrição única `(user_id, title_normalized)` e o upsert por `on_conflict` impedem duplicatas. O lote gerado também é deduplicado antes do envio.
+- **Limite diário:** cada chamada que usa o Gemini é registrada em `recipe_generations`. O limite é de 10 gerações por dia, contado a partir da meia-noite de `America/Sao_Paulo`.
+- **Autenticação:** a Edge Function exige o JWT do usuário e usa a sessão dele nas operações REST, preservando a RLS. Requisições sem sessão retornam `401`.
+- **Descobrir mais receitas:** o modal lista a biblioteca diretamente pela tabela `recipes`, com busca por título/categoria e paginação de 20. O botão **Gerar mais receitas** usa o mesmo fluxo cache-first.
+- **Contrato do frontend:** `listRecipesByIngredients` devolve `recipes`, `source`, `cacheHits`, `generated`, `remainingGenerationsToday` e `limitReached`.
+- **Testes:** 16 testes unitários com Vitest cobrem normalização, contrato de receita e deduplicação.
+
+A decisão de persistir por upsert direto no PostgREST, em vez da RPC `upsert_generated_recipes` prevista no plano, está justificada em [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
 ## 6. Organização atual dos principais componentes
 
@@ -293,13 +314,14 @@ O detalhamento completo está em [`plano_implementacao_v3.md`](./plano_implement
 | `Root.jsx` | Resolve a sessão inicial e controla o fluxo landing → login → aplicativo. |
 | `LandingPage.jsx` | Apresenta a proposta do produto e direciona para login ou criação de conta. |
 | `LoginScreen.jsx` | Oferece o login/cadastro com Google e trata carregamento e erros do OAuth. |
-| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas” e as seções de planejamento/configurações e coordena o registro de consumo. |
+| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas” e as seções de planejamento/configurações, coordena o registro de consumo e integra o modal de descoberta de receitas. |
 | `MyRecipesPage.jsx` | Exibe o inventário, a busca e a linha do tempo das receitas executadas pelo usuário. |
 | `WeekPlanner.jsx` | Renderiza a grade semanal persistente, com adicionar, abrir e remover refeições. |
 | `PlanMealModal.jsx` | Permite escolher dia, tipo de refeição e receita antes de gravar o slot. |
 | `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente. |
 | `RecipeDetailModal.jsx` | Exibe ingredientes, tempo, porções e modo de preparo da receita. |
 | `CookRecipeModal.jsx` | Confirma quais itens da despensa serão consumidos e em que quantidade. |
+| `DiscoverRecipesModal.jsx` | Lista a biblioteca, busca, pagina e gera mais receitas. |
 | `FeatureCard.jsx` | Apresenta visualmente uma receita. |
 | `AppHeader.jsx` | Apresenta o cabeçalho, o avatar e o menu da conta com logout. |
 | `UserAvatar.jsx` | Exibe o avatar do Google com fallback para a inicial do nome. |
@@ -309,25 +331,26 @@ O detalhamento completo está em [`plano_implementacao_v3.md`](./plano_implement
 | `mealPlan.js` (serviço) | Lista, agenda/substitui e remove refeições do planejamento semanal. |
 | `mealPlan.js` (lib) | Define dias da semana, rótulos e tipos de refeição aceitos pelo banco. |
 | `recipeSnapshot.js` | Monta o snapshot compartilhado de receita usado pelo consumo e pelo planejamento. |
-| `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas. |
+| `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas, incluindo os metadados de cache e limite. |
+| `recipeLibrary.js` (serviço) | Lista a biblioteca, consulta o status de gerações e busca por título. |
+| `recipeNormalization.js` | Normaliza títulos e ingredientes para deduplicação e cache. |
+| `recipeRecord.js` | Converte respostas da API e linhas do banco para o contrato dos cards e faz merge por título. |
 | `supabase.js` | Centraliza a criação do cliente Supabase com persistência e PKCE. |
 | `auth.js` | Centraliza login Google, logout, sessão e dados do perfil. |
 | `session.js` | Exige sessão autenticada antes de qualquer operação nos serviços. |
 | `ingredientMatch.js` | Relaciona os nomes de ingredientes das receitas aos itens da despensa. |
-| `recipe-suggestions/index.ts` | Protege a chave do Gemini, gera receitas em PT-BR via Structured Output e mapeia imagens por categoria. |
+| `recipe-suggestions/index.ts` | Valida o JWT, consulta o cache, gera receitas em PT-BR via Structured Output, persiste na biblioteca, aplica o limite diário e mapeia imagens. |
 | Migração inicial | Cria tabelas, relacionamentos, validações, índices e políticas de segurança. |
 | Migração da Fase 3 | Adiciona `status` a `pantry_items` e a função transacional de consumo. |
 | Migração do histórico | Cria `user_recipes` com RLS e amplia a RPC para gravar o snapshot da receita na mesma transação. |
 | Migração de calorias | Adiciona `calories_per_serving` ao histórico e amplia a RPC de consumo. |
 | Migração do planejamento | Cria `meal_plans` com RLS, restrição de slot único e snapshot da receita. |
+| Migração da biblioteca | Cria `recipes`, `recipe_generations`, índices, RLS e a RPC `find_recipes_for_pantry`. |
 
-### 6.1 Componentes previstos para o v3 (ainda não implementados)
+### 6.1 Componentes previstos para as fases restantes do v3
 
 | Elemento planejado | Fase | Responsabilidade |
 |---|---|---|
-| `recipes` (tabela) | 7 | Biblioteca de receitas por usuário, com snapshot, ingredientes normalizados e favorito. |
-| `recipe-suggestions` (evolução) | 7 | Consulta cache-first na biblioteca antes de chamar o Gemini. |
-| `DiscoverRecipesModal.jsx` | 7 | Modal com a biblioteca, busca, paginação e geração de mais receitas. |
 | `PlanningPage.jsx` | 5 | Aba com semana atual, templates, ciclo de 4 semanas e histórico. |
 | `TemplateEditorModal.jsx` | 5 | Edição da grade semanal em modo template. |
 | `FavoriteButton.jsx` | 6 | Alterna favorito em cards, modais, histórico e planejamento. |
@@ -408,16 +431,17 @@ Essa distinção será usada quando os requisitos forem revisados.
 | Gestão da despensa (CRUD) | Implementada | Cadastro, edição e exclusão suave (arquivamento) com validação e atualização reativa. |
 | Listagem da despensa | Implementada | Inclui carregamento, vazio e erro. |
 | Segurança RLS | Implementada no banco | Políticas vinculadas ao usuário. |
-| Sugestão de receitas (Gemini / Google AI Studio) | Implementada | Geração via Edge Function + Structured Output em PT-BR nativo. |
+| Sugestão de receitas (Gemini / Google AI Studio) | Implementada | Geração via Edge Function + Structured Output em PT-BR nativo, com cache-first e biblioteca persistida desde a Fase 7. |
 | Detalhamento de receitas (Gemini) | Implementado | Modal com tempo, porções, ingredientes faltantes/em estoque e modo de preparo passo a passo — dados embutidos na primeira resposta, sem segunda requisição. |
 | Geração de receitas por IA (Open Source / Google AI Studio) | Implementada (Gemini) | Motor migrado do Spoonacular para o Gemini 2.0 Flash com PT-BR nativo. |
 | Movimentação de estoque | Implementada (consumo) | Consumo total/parcial de receitas grava em `stock_movements` e atualiza a despensa de forma transacional. |
 | Histórico “Minhas receitas” | Implementado | Tabela `user_recipes` com RLS, inventário agrupado, busca e linha do tempo por usuário. |
 | Alertas de validade | Planejados | Ainda não existe regra ativa ou central de alertas. |
 | Planejamento semanal | Implementado (Fase 4) | Slots persistentes por dia e tipo de refeição, com snapshot da receita, substituição e remoção. Templates, ciclo de 4 semanas e histórico estão planejados para a Fase 5. |
-| Biblioteca de receitas com IA | Planejada (Fase 7) | Persistência de todas as receitas geradas, deduplicação por título e geração cache-first. |
+| Biblioteca de receitas com IA | Implementada (Fase 7) | Tabela `recipes` com snapshot, deduplicação por título, RLS e geração cache-first. |
 | Favoritas | Planejada (Fase 6) | Favorito com snapshot e aba própria em “Minhas receitas”. |
-| Descobrir mais receitas | Planejada (Fase 7) | Modal com a biblioteca persistida, busca, paginação e geração de mais receitas. |
+| Descobrir mais receitas | Implementado (Fase 7) | Modal com a biblioteca persistida, busca, paginação de 20 e geração de mais receitas. |
+| Testes automatizados | Implementado (Fase 7) | Vitest com 16 testes unitários de normalização, contrato e deduplicação. |
 | Dark mode / Configurações | Planejado (Fase 8) | Tema claro, escuro e sistema, persistido em `localStorage`. |
 | Lista de compras | Planejada (Fase 9) | Sugestões por consumo/entradas, faltantes do planejamento e itens manuais. |
 | Entrada/reposição de estoque | Planejada (Fase 9) | Fluxo de `entry` em `stock_movements` e atualização transacional do saldo. |
@@ -436,12 +460,16 @@ Essa distinção será usada quando os requisitos forem revisados.
 - O planejamento semanal é recorrente e ainda não possui `week_start`, templates, ciclo de 4 semanas ou histórico; isso está planejado para a Fase 5.
 - Cada slot do planejamento aceita apenas uma receita; prato principal e acompanhamento exigem slots separados ou uma receita combinada.
 - Não existe lista de compras automática a partir dos ingredientes faltantes do planejamento; a Fase 9 prevê essa derivação.
-- As receitas geradas pela IA ainda são efêmeras e não ficam na biblioteca; a persistência cache-first está planejada para a Fase 7.
+- O cache compara nomes normalizados literalmente; sinônimos e variações regionais podem não casar. O mínimo de 2 ingredientes em comum também pode excluir receitas que usam apenas 1 item da despensa.
+- O limite diário conta chamadas de geração, não receitas individuais; uma chamada que gera várias receitas consome uma geração.
+- O selo **Gerada agora** pode não aparecer após recarregar o modal, porque a listagem da biblioteca não distingue a origem da geração; é um refinamento cosmético.
+- A biblioteca ainda não permite excluir receitas pela interface.
+- A validação autenticada de ponta a ponta da Fase 7 (geração real, persistência e limite diário) depende da conta Google do usuário e permanece pendente.
 - A configuração do provider Google no Supabase ainda depende do Client ID e do Client Secret gerados no Google Cloud Console.
 - O login com Google exige que a URL de produção seja adicionada às origens autorizadas e às Redirect URLs do Supabase após o deploy.
-- O botão para descobrir mais receitas e a ação de favoritar ainda não possuem fluxo completo; ambos estão planejados para as fases 6 e 7.
+- A ação de favoritar ainda não possui fluxo completo; está planejada para a Fase 6. O botão **Descobrir mais receitas** já está implementado.
 - Não existe experiência offline nem instalação como PWA nesta etapa; o push do navegador também não está implementado.
-- Ainda será necessário ampliar a estratégia de testes automatizados e de observação de falhas; o plano está documentado em [`plano_testes.md`](./plano_testes.md), mas a execução começa com a Fase 7.
+- A estratégia de testes foi iniciada na Fase 7 com 16 testes unitários; testes de integração, RLS e fluxos autenticados ainda serão ampliados, conforme [`plano_testes.md`](./plano_testes.md).
 
 ## 10. Verificações realizadas até esta etapa
 
@@ -471,24 +499,31 @@ Durante a implementação foram realizados os seguintes controles:
 - deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app` (bundle `App-BUKnWRSJ.js` com o código do planejamento semanal);
 - execução do ESLint e do build do Vite após o ajuste de rolagem do inventário, sem erros;
 - smoke test via PostgREST: `meal_plans` e `user_recipes` existem e respondem `42501` (permission denied) para `anon`, confirmando tabelas presentes e grants corretos;
-- criação e revisão dos documentos de planejamento v3 (`DECISOES_DE_PROJETO.md`, `plano_implementacao_v3.md` e `plano_testes.md`), sem alteração de código funcional nesta etapa.
+- criação e revisão dos documentos de planejamento v3 (`DECISOES_DE_PROJETO.md`, `plano_implementacao_v3.md` e `plano_testes.md`), sem alteração de código funcional nesta etapa;
+- aplicação da migração `20261112120000_recipes_library.sql` no projeto remoto, com `supabase migration list --remote` confirmando as 7 migrações sincronizadas;
+- republicação da Edge Function `recipe-suggestions` em 12/11/2026 com autenticação JWT, cache-first, persistência e limite diário;
+- smoke test da Edge Function: `OPTIONS` retorna `200`; `POST` sem JWT e com JWT inválido retornam `401`;
+- smoke test via PostgREST: `recipes` e `find_recipes_for_pantry` respondem `42501` (permission denied) para `anon`;
+- execução de `npm test` com 16 testes unitários aprovados em 2 arquivos;
+- execução do ESLint e do build do Vite após a Fase 7, sem erros (bundle `App-DGRzoN0o.js`).
 
 > [!NOTE]
-> Todas as migrações locais estão sincronizadas com o projeto Supabase remoto em 11/11/2026: inicial, imagens, consumo, histórico, calorias e planejamento semanal. A migração de calorias estava pendente desde 08/11/2026 e foi aplicada junto com a da Fase 4. A Edge Function também foi publicada novamente na mesma data.
+> Todas as migrações locais estão sincronizadas com o projeto Supabase remoto em 12/11/2026: inicial, imagens, consumo, histórico, calorias, planejamento semanal e biblioteca de receitas (7 migrações). A Edge Function `recipe-suggestions` foi republicada na mesma data com o fluxo cache-first. O teste autenticado completo da Fase 7 permanece pendente.
 
 Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas não substituem a avaliação com usuários nem a medição de redução do desperdício.
 
 ## 11. Direção para os próximos incrementos
 
-A sequência aprovada para o v3 é:
+A Fase 7 foi concluída em 12/11/2026. A sequência aprovada para o restante do v3 é:
 
-1. **Fase 7 — Biblioteca de receitas e cache-first:** persistir as receitas geradas, deduplicar por título e consultar a biblioteca antes do Gemini; criar o modal “Descobrir mais receitas”.
-2. **Fase 5 — Templates de planejamento:** até 4 templates por usuário, ciclo de 4 semanas, aplicação com substituição, edição independente e histórico.
-3. **Fase 6 — Favoritas:** coração em todos os pontos de receita e aba própria em “Minhas receitas”.
-4. **Fase 8 — Dark mode:** aba Configurações, tema claro/escuro/sistema e aplicação em toda a interface.
-5. **Fase 9 — Lista de compras:** fluxo de entrada/reposição, sugestões por consumo e volume, faltantes do planejamento e itens manuais.
-6. **Fase 11 — Smart Chef (stretch):** chat com contexto da despensa, ações estruturadas e limite de 7 mensagens/dia.
-7. **Fase 10 — Notificações (stretch):** avisos in-app de vencimento, central, adiar/dispensar e preferência nas configurações.
+1. **Fase 5 — Templates de planejamento:** até 4 templates por usuário, ciclo de 4 semanas, aplicação com substituição, edição independente e histórico.
+2. **Fase 6 — Favoritas:** coração em todos os pontos de receita e aba própria em “Minhas receitas”.
+3. **Fase 8 — Dark mode:** aba Configurações, tema claro/escuro/sistema e aplicação em toda a interface.
+4. **Fase 9 — Lista de compras:** fluxo de entrada/reposição, sugestões por consumo e volume, faltantes do planejamento e itens manuais.
+5. **Fase 11 — Smart Chef (stretch):** chat com contexto da despensa, ações estruturadas e limite de 7 mensagens/dia.
+6. **Fase 10 — Notificações (stretch):** avisos in-app de vencimento, central, adiar/dispensar e preferência nas configurações.
+
+O registro da Fase 7 está em [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
 Cada fase deve ser entregue com migração, documentação, testes e deploy próprios. As fases 10 e 11, assim como refinamentos apenas cosméticos, podem ser reduzidas ou adiadas se o tempo do TCC apertar.
 
@@ -504,6 +539,6 @@ Quando os requisitos forem atualizados, cada um deverá nascer de uma evidência
 
 Os requisitos poderão então ser ligados aos casos de uso, tabelas, componentes, testes e resultados esperados. Essa abordagem permitirá construir posteriormente uma matriz de rastreabilidade coerente com o produto real.
 
-A estratégia de verificação do v3 está documentada em [`plano_testes.md`](./plano_testes.md), com casos por fase, critérios de aceite, testes de RLS, usabilidade e smoke test de produção. A execução dos testes começa junto da Fase 7.
+A estratégia de verificação do v3 está documentada em [`plano_testes.md`](./plano_testes.md), com casos por fase, critérios de aceite, testes de RLS, usabilidade e smoke test de produção. A execução começou na Fase 7, com os testes unitários de normalização e contrato; os testes de integração, RLS e usabilidade serão ampliados nas próximas fases.
 
 Até essa revisão, este documento deve ser tratado como o registro principal do estado da implementação. Ele deverá ser atualizado ao final de cada incremento relevante, registrando o que foi entregue, o que mudou e quais limitações permanecem.

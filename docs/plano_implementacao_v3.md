@@ -2,9 +2,9 @@
 
 **Data:** 12 de novembro de 2026
 
-**Versão:** 1.0
+**Versão:** 1.1
 
-**Status:** planejamento aprovado; implementação ainda não iniciada.
+**Status:** em execução; Fase 7 concluída em 12/11/2026; fases 5, 6, 8, 9, 11 e 10 planejadas.
 
 **Documentos relacionados:**
 - [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) — perguntas e respostas que orientam este plano.
@@ -983,10 +983,11 @@ Uma fase só é considerada concluída quando:
 
 ## 16. Próximos passos
 
-1. Criar `docs/plano_testes.md` (concluído junto deste plano).
-2. Atualizar `docs/ESTADO_ATUAL_DO_PROJETO.md` para a versão 2.0.
-3. Iniciar a **Fase 7**: migração `recipes` + `recipe_generations`, RPCs, Edge Function cache-first e modal “Descobrir mais receitas”.
-4. Registrar o incremento em `docs/ESCOPO_INCREMENTO_5.md` (a numeração do incremento segue a ordem de implementação, não a ordem original das fases).
+1. ~~Criar `docs/plano_testes.md`~~ (concluído junto deste plano).
+2. ~~Atualizar `docs/ESTADO_ATUAL_DO_PROJETO.md` para a versão 2.0~~ (concluído; a versão 2.1 registra a Fase 7).
+3. ~~Iniciar a **Fase 7**: migração `recipes` + `recipe_generations`, RPCs, Edge Function cache-first e modal “Descobrir mais receitas”~~ (concluída em 12/11/2026).
+4. ~~Registrar o incremento em `docs/ESCOPO_INCREMENTO_5.md`~~ (concluído).
+5. Iniciar a **Fase 5 — Templates de planejamento**.
 
 ---
 
@@ -995,3 +996,4 @@ Uma fase só é considerada concluída quando:
 | Versão | Data | Alteração |
 |---|---|---|
 | 1.0 | 12/11/2026 | Criação do plano v3 com as fases 7 → 5 → 6 → 8 → 9 → 11 → 10, modelo de dados, RPCs, critérios de pronto e riscos. |
+| 1.1 | 12/11/2026 | Fase 7 registrada como concluída; próximos passos atualizados para a Fase 5. |

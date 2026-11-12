@@ -1,6 +1,7 @@
 // Importamos o cliente do Supabase já configurado no projeto.
 // A aplicação chamará uma Edge Function do Supabase em vez de acessar
 // qualquer API de terceiros diretamente, mantendo as chaves privadas no servidor.
+import { normalizeRecipeFromApi } from '../lib/recipeRecord.js'
 import { isSupabaseConfigured, supabase } from '../lib/supabase.js'
 
 // Nome da Edge Function responsável por gerar receitas via Gemini API.
@@ -64,50 +65,6 @@ function normalizeLimit(limit) {
 }
 
 /**
- * Converte uma receita retornada pelo Gemini (via Edge Function) para o
- * formato usado na tela. Inclui steps e servings que agora vêm embutidos
- * na primeira resposta, eliminando a necessidade de uma segunda requisição.
- */
-function normalizeRecipe(recipe) {
-  // As contagens chegam como inteiros do Gemini, mas garantimos número por segurança.
-  const usedIngredientCount = Number(recipe.usedIngredientCount ?? 0)
-  const missedIngredientCount = Number(recipe.missedIngredientCount ?? 0)
-  const readyInMinutes = Number(recipe.readyInMinutes ?? 0)
-  const servings = Number(recipe.servings ?? 0)
-  const caloriesPerServing = Number(recipe.caloriesPerServing ?? 0)
-
-  // Retornamos um novo objeto contendo todos os dados necessários para o app,
-  // incluindo steps e servings que antes exigiam uma segunda chamada à API.
-  return {
-    id: recipe.id,
-    title: recipe.title || 'Receita sem nome',
-    image: recipe.image || '',
-    category: recipe.category || 'outros',
-    readyInMinutes,
-    servings,
-    caloriesPerServing:
-      Number.isFinite(caloriesPerServing) && caloriesPerServing > 0
-        ? Math.round(caloriesPerServing)
-        : 0,
-    time: readyInMinutes > 0 ? `${readyInMinutes} min` : 'Tempo não informado',
-    usedIngredientCount,
-    missedIngredientCount,
-    usedIngredients: recipe.usedIngredients ?? [],
-    missedIngredients: recipe.missedIngredients ?? [],
-    // steps vem embutido do Gemini — sem segunda requisição necessária.
-    steps: Array.isArray(recipe.steps) ? recipe.steps : [],
-    ingredients: `${usedIngredientCount} ingrediente${usedIngredientCount === 1 ? '' : 's'} da despensa`,
-    // Metadados da imagem real (Wikimedia Commons) ou do fallback por categoria.
-    imageQuery: recipe.imageQuery || '',
-    imageSource: recipe.imageSource || '',
-    imageAuthor: recipe.imageAuthor || '',
-    imageLicense: recipe.imageLicense || '',
-    imageLicenseUrl: recipe.imageLicenseUrl || '',
-    imageSourceUrl: recipe.imageSourceUrl || '',
-  }
-}
-
-/**
  * Extrai a mensagem devolvida pela Edge Function.
  *
  * O SDK do Supabase guarda a resposta HTTP em `error.context`; sem isso, o
@@ -141,9 +98,19 @@ async function getFunctionErrorMessage(error) {
 /**
  * Busca receitas que aproveitem os ingredientes cadastrados na despensa.
  *
+ * A Edge Function consulta primeiro a biblioteca do usuário (cache-first) e
+ * só chama o Gemini quando a biblioteca não cobre a quantidade pedida.
+ *
  * @param {Array<string | { name: string }>} ingredients itens da despensa
  * @param {{ limit?: number }} options configurações opcionais da busca
- * @returns {Promise<Array>} lista de receitas pronta para o React renderizar
+ * @returns {Promise<{
+ *   recipes: Array,
+ *   source: 'cache' | 'mixed' | 'ai',
+ *   cacheHits: number,
+ *   generated: number,
+ *   remainingGenerationsToday: number | null,
+ *   limitReached: boolean,
+ * }>} receitas e metadados da geração
  */
 export async function listRecipesByIngredients(ingredients, options = {}) {
   // O frontend só pode chamar a função se o cliente Supabase estiver pronto.
@@ -156,9 +123,18 @@ export async function listRecipesByIngredients(ingredients, options = {}) {
   // Preparamos os nomes antes de enviá-los ao backend.
   const ingredientNames = normalizeIngredientNames(ingredients)
 
-  // Sem ingredientes não há o que pesquisar. Retornar [] simplifica o React,
-  // pois ele poderá tratar o resultado como qualquer outra lista vazia.
-  if (ingredientNames.length === 0) return []
+  // Sem ingredientes não há o que pesquisar. O objeto vazio mantém o mesmo
+  // contrato de retorno usado quando a consulta é concluída.
+  if (ingredientNames.length === 0) {
+    return {
+      recipes: [],
+      source: 'cache',
+      cacheHits: 0,
+      generated: 0,
+      remainingGenerationsToday: null,
+      limitReached: false,
+    }
+  }
 
   // options.limit usa o valor informado pelo chamador ou o padrão definido.
   const limit = normalizeLimit(options.limit ?? DEFAULT_RECIPE_LIMIT)
@@ -184,17 +160,29 @@ export async function listRecipesByIngredients(ingredients, options = {}) {
   }
 
   // Aceitamos os dois formatos abaixo para facilitar a evolução do backend:
-  //   { recipes: [...] }
+  //   { recipes: [...], source, cacheHits, generated }
   //   [...]
-  const recipes = Array.isArray(data) ? data : data?.recipes
+  const payload = Array.isArray(data) ? { recipes: data } : (data ?? {})
+  const recipes = payload.recipes
 
   // Uma resposta fora do contrato é tratada como erro, evitando quebrar a UI.
   if (!Array.isArray(recipes)) {
     throw new Error('A resposta do serviço de receitas é inválida.')
   }
 
-  // map converte cada item da resposta para o formato interno do Smart Pantry.
-  return recipes.map(normalizeRecipe)
+  const remaining = payload.remainingGenerationsToday
+
+  return {
+    recipes: recipes.map(normalizeRecipeFromApi),
+    source: payload.source || 'ai',
+    cacheHits: Number(payload.cacheHits ?? 0),
+    generated: Number(payload.generated ?? recipes.length),
+    remainingGenerationsToday:
+      remaining == null || !Number.isFinite(Number(remaining))
+        ? null
+        : Number(remaining),
+    limitReached: Boolean(payload.limitReached),
+  }
 }
 
 /**

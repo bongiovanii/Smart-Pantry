@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import AppHeader from '../components/AppHeader.jsx'
 import CookRecipeModal from '../components/CookRecipeModal.jsx'
+import DiscoverRecipesModal from '../components/DiscoverRecipesModal.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
 import PlanMealModal from '../components/PlanMealModal.jsx'
@@ -11,6 +12,7 @@ import MyRecipesPage from './MyRecipesPage.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
+import { mergeRecipeLists } from '../lib/recipeRecord.js'
 import {
   assignMealToDay,
   listWeeklyPlan,
@@ -181,6 +183,8 @@ function App({ user, onSignOut }) {
   const [selectedRecipe, setSelectedRecipe] = useState(null)
   const [isRecipesLoading, setIsRecipesLoading] = useState(false)
   const [recipeError, setRecipeError] = useState('')
+  const [recipeMeta, setRecipeMeta] = useState(null)
+  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false)
   const lastRecipeRequest = useRef('')
   const [cookRecipe, setCookRecipe] = useState(null)
   const [isConsuming, setIsConsuming] = useState(false)
@@ -296,10 +300,11 @@ function App({ user, onSignOut }) {
 
     // Passamos os objetos da despensa diretamente para o serviço.
     listRecipesByIngredients(ingredients, { limit: 6 })
-      .then((results) => {
+      .then((result) => {
         // Só atualizamos a tela se esta ainda for a consulta mais recente.
         if (lastRecipeRequest.current === ingredientKey) {
-          setRecipes(results)
+          setRecipes(result.recipes)
+          setRecipeMeta(result)
           setRecipeError('')
         }
       })
@@ -309,6 +314,7 @@ function App({ user, onSignOut }) {
             error.message || 'Não foi possível carregar as receitas.',
           )
           setRecipes([])
+          setRecipeMeta(null)
           setIsRecipesLoading(false)
 
           // Libera a combinação para uma futura tentativa.
@@ -660,9 +666,21 @@ function App({ user, onSignOut }) {
                   Receitas sugeridas
                 </h2>
               </div>
-              <span className="hidden rounded-full bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface-variant sm:inline-block">
-                Com base na despensa
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {recipeMeta?.source === 'cache' && (
+                  <span className="rounded-full bg-secondary-container px-3 py-1 text-xs font-semibold text-primary">
+                    Da sua biblioteca
+                  </span>
+                )}
+                {recipeMeta?.limitReached && (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                    Limite diário atingido
+                  </span>
+                )}
+                <span className="hidden rounded-full bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface-variant sm:inline-block">
+                  Com base na despensa
+                </span>
+              </div>
             </div>
 
             {recipeError && (
@@ -717,7 +735,11 @@ function App({ user, onSignOut }) {
                   </article>
                 )}
 
-              <button className="surface-card flex min-h-56 flex-col items-center justify-center border-dashed p-5 text-primary transition hover:bg-surface-container-low">
+              <button
+                className="surface-card flex min-h-56 flex-col items-center justify-center border-dashed p-5 text-primary transition hover:bg-surface-container-low"
+                onClick={() => setIsDiscoverOpen(true)}
+                type="button"
+              >
                 <span className="material-symbols-outlined mb-2 text-3xl">explore</span>
                 <span className="text-sm font-bold">Descobrir mais receitas</span>
               </button>
@@ -788,6 +810,28 @@ function App({ user, onSignOut }) {
             </div>
           </div>
         </div>
+      )}
+
+      {isDiscoverOpen && (
+        <DiscoverRecipesModal
+          isOpen={true}
+          onClose={() => setIsDiscoverOpen(false)}
+          onOpenRecipe={(recipe) => {
+            setIsDiscoverOpen(false)
+            setSelectedRecipe(recipe)
+          }}
+          onPlan={(recipe) => {
+            setIsDiscoverOpen(false)
+            handlePlanRecipe(recipe)
+          }}
+          onRecipesGenerated={(generated, meta) => {
+            if (generated?.length) {
+              setRecipes((current) => mergeRecipeLists(current, generated))
+            }
+            if (meta) setRecipeMeta(meta)
+          }}
+          pantryItems={ingredients}
+        />
       )}
 
       {selectedRecipe && (

@@ -2,9 +2,9 @@
 
 **Data:** 12 de novembro de 2026
 
-**Versão:** 1.0
+**Versão:** 1.1
 
-**Status:** planejamento; execução começa junto da Fase 7.
+**Status:** em execução; a Fase 7 inaugurou os testes unitários com Vitest (16 casos). Testes de integração, RLS e fluxos autenticados seguem pendentes.
 
 **Documentos relacionados:**
 - [`plano_implementacao_v3.md`](./plano_implementacao_v3.md)
@@ -340,31 +340,34 @@ Executar após cada deploy em `https://smart-pantry-coral.vercel.app`:
 
 ```text
 app/src/lib/__tests__/
-  normalizeRecipe.test.js
-  week.test.js
-  shoppingSuggestions.test.js
-  expiration.test.js
-  theme.test.js
-  chatLimit.test.js
+  recipeNormalization.test.js   (implementado na Fase 7)
+  recipeRecord.test.js          (implementado na Fase 7)
+  week.test.js                  (previsto para a Fase 5)
+  shoppingSuggestions.test.js   (previsto para a Fase 9)
+  expiration.test.js            (previsto para a Fase 10)
+  theme.test.js                 (previsto para a Fase 8)
+  chatLimit.test.js             (previsto para a Fase 11)
 ```
 
 ### 10.2 Casos automatizados prioritários
 
-| Arquivo | Casos |
-|---|---|
-| `normalizeRecipe.test.js` | normalização de título, ingredientes, plural, dedupe. |
-| `week.test.js` | segunda-feira, índice do ciclo, virada de semana, formatação. |
-| `shoppingSuggestions.test.js` | score, média das últimas 3 entradas, exclusão de estoque alto, faltantes do plano. |
-| `expiration.test.js` | janela de 7 dias, itens vencidos, snooze, um aviso por dia. |
-| `theme.test.js` | resolução de `system`, persistência e fallback. |
-| `chatLimit.test.js` | limite de 7 mensagens, reset diário e contagem. |
+| Arquivo | Casos | Status |
+|---|---|---|
+| `recipeNormalization.test.js` | normalização de título, ingredientes, plural, dedupe. | Implementado (16 casos no total, com `recipeRecord.test.js`). |
+| `recipeRecord.test.js` | contrato da API, contrato da linha do banco e merge por título. | Implementado. |
+| `week.test.js` | segunda-feira, índice do ciclo, virada de semana, formatação. | Previsto para a Fase 5. |
+| `shoppingSuggestions.test.js` | score, média das últimas 3 entradas, exclusão de estoque alto, faltantes do plano. | Previsto para a Fase 9. |
+| `expiration.test.js` | janela de 7 dias, itens vencidos, snooze, um aviso por dia. | Previsto para a Fase 10. |
+| `theme.test.js` | resolução de `system`, persistência e fallback. | Previsto para a Fase 8. |
+| `chatLimit.test.js` | limite de 7 mensagens, reset diário e contagem. | Previsto para a Fase 11. |
 
 ### 10.3 Configuração
 
-- Adicionar `vitest` em `devDependencies`.
-- Criar `app/vitest.config.js` com ambiente `node` para funções puras.
-- Adicionar script `"test": "vitest run"` e `"test:coverage": "vitest run --coverage"`.
+- ~~Adicionar `vitest` em `devDependencies`.~~ Concluído na Fase 7.
+- Não foi necessário criar `app/vitest.config.js`: os testes são funções puras e o Vitest usa a configuração padrão.
+- ~~Adicionar script `"test": "vitest run"`.~~ Concluído; também foi adicionado `"test:watch": "vitest"`.
 - Manter os testes puros, sem chamadas reais ao Supabase.
+- O script de cobertura (`test:coverage`) permanece opcional e não foi adicionado nesta fase.
 
 ---
 
@@ -372,7 +375,7 @@ app/src/lib/__tests__/
 
 | Momento | Testes |
 |---|---|
-| Durante a Fase 7 | Unitários de normalização + integração de cache + RLS. |
+| Durante a Fase 7 | Unitários de normalização concluídos (16); integração de cache e RLS pendentes. |
 | Durante a Fase 5 | Unitários de ciclo + integração de templates + RLS. |
 | Durante a Fase 6 | Integração de favoritas + regressão de receitas. |
 | Durante a Fase 8 | Testes visuais e de persistência do tema. |
@@ -401,3 +404,4 @@ app/src/lib/__tests__/
 | Versão | Data | Alteração |
 |---|---|---|
 | 1.0 | 12/11/2026 | Criação do plano de testes com estratégia, casos por fase, RLS, usabilidade, smoke test e automação. |
+| 1.1 | 12/11/2026 | Fase 7 registrada: 16 testes unitários implementados com Vitest; integração de cache e RLS pendentes. |
