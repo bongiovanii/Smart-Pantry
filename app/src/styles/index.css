@@ -60,6 +60,42 @@ button {
   box-shadow: 0 4px 14px rgb(45 90 39 / 0.06);
 }
 
+/* Inventário com altura limitada: mostra até 4 itens e mantém a rolagem
+   vertical quando a despensa cresce. No desktop os 4 itens aparecem em
+   2 linhas; no mobile, em 4 linhas. */
+.inventory-list {
+  max-height: 36rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(114 121 110 / 0.55) transparent;
+}
+
+.inventory-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.inventory-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inventory-list::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background-color: rgb(114 121 110 / 0.45);
+}
+
+.inventory-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(21 66 18 / 0.55);
+}
+
+@media (min-width: 640px) {
+  .inventory-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 17.75rem;
+  }
+}
+
 .side-link {
   display: flex;
   align-items: center;

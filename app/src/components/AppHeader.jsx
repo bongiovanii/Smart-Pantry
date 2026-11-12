@@ -52,7 +52,7 @@ function AppHeader({ user, onSignOut }) {
               Smart Pantry
             </p>
             <p className="text-lg font-bold tracking-tight text-primary sm:text-xl">
-              Dispensa Inteligente
+              Despensa Inteligente
             </p>
           </div>
         </div>

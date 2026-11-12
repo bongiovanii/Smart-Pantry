@@ -589,7 +589,11 @@ function App({ user, onSignOut }) {
                 )}
 
                 {!isLoading && !loadError && ingredients.length > 0 && (
-                  <ul className="grid gap-3 sm:grid-cols-2">
+                  <ul
+                    aria-label="Itens da despensa"
+                    className="inventory-list grid gap-3 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:outline-none"
+                    tabIndex={0}
+                  >
                     {ingredients.map((ingredient) => (
                       <li
                         className="flex flex-col justify-between rounded-xl border border-outline-variant bg-white p-4 transition hover:border-primary/30"

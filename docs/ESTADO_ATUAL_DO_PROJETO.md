@@ -1,8 +1,8 @@
 # Smart Pantry — Estado atual do projeto
 
-**Data de atualização:** 11 de novembro de 2026
+**Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 1.1
+**Versão do documento:** 1.2
 
 **Fase atual:** base técnica concluída, CRUD da despensa, integração de receitas com IA, registro de consumo de receitas (Fase 3), histórico “Minhas receitas” por usuário, autenticação com Google e planejamento semanal persistente (Fase 4) implementados.
 
@@ -14,6 +14,7 @@
 |---|---|---|
 | 1.0 | 08/11/2026 | Consolidação do estado após o Incremento 3: histórico de receitas, autenticação com Google, deploy público, correção do 502 e kcal nas receitas. |
 | 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes, republicação da Edge Function e deploy do frontend confirmado em produção. |
+| 1.2 | 12/11/2026 | Correção de usabilidade: o inventário da despensa passou a ter altura fixa com rolagem interna, exibindo até 4 itens antes de rolar. |
 
 
 ## 1. Finalidade deste documento
@@ -138,6 +139,8 @@ A interface apresenta:
 - quantidade e unidade;
 - data de validade ou indicação de que ela não foi informada;
 - quantidade total de itens atualmente exibidos.
+
+O widget de inventário mantém uma altura fixa e exibe até 4 itens antes de ativar a rolagem vertical: no desktop são 2 linhas de 2 itens e, no mobile, 4 linhas. A lista tem rolagem própria (`overflow-y: auto`), barra de rolagem discreta e `overscroll-behavior: contain`, evitando que a rolagem interna propague para a página.
 
 Também foram implementados estados de carregamento, despensa vazia, falha de conexão e tentativa de recarregamento.
 
@@ -394,6 +397,7 @@ Durante a implementação foram realizados os seguintes controles:
 - aplicação das migrações `20261108200000_recipe_calories.sql` e `20261111234500_meal_plans.sql` no projeto remoto, confirmada por `supabase migration list --remote`;
 - republicação da Edge Function `recipe-suggestions` em 11/11/2026, garantindo em produção o prompt com `caloriesPerServing` e o fallback entre modelos do Gemini;
 - deploy do frontend confirmado em `https://smart-pantry-coral.vercel.app` (bundle `App-BUKnWRSJ.js` com o código do planejamento semanal);
+- execução do ESLint e do build do Vite após o ajuste de rolagem do inventário, sem erros;
 - smoke test via PostgREST: `meal_plans` e `user_recipes` existem e respondem `42501` (permission denied) para `anon`, confirmando tabelas presentes e grants corretos.
 
 > [!NOTE]
