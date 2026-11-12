@@ -38,6 +38,7 @@ export const DAILY_GENERATION_LIMIT = 10
  */
 export async function listRecipeLibrary({
   search = '',
+  category = '',
   page = 1,
   pageSize = 20,
 } = {}) {
@@ -55,6 +56,11 @@ export async function listRecipeLibrary({
     .range(from, to)
 
   const term = search.trim()
+  const selectedCategory = String(category ?? '').trim()
+
+  if (selectedCategory) {
+    query = query.eq('category', selectedCategory)
+  }
 
   if (term) {
     // Vírgulas, parênteses e curingas quebrariam a sintaxe do `or` do PostgREST.
@@ -79,6 +85,29 @@ export async function listRecipeLibrary({
     pageSize: safePageSize,
     totalPages: Math.max(1, Math.ceil(total / safePageSize)),
   }
+}
+
+/**
+ * Lista as categorias presentes na biblioteca do usuário. Usado pelo filtro
+ * do seletor de receitas dos templates.
+ */
+export async function listRecipeCategories() {
+  const session = await getCurrentSession()
+
+  const { data, error } = await supabase
+    .from('recipes')
+    .select('category')
+    .eq('user_id', session.user.id)
+
+  if (error) throw error
+
+  return [
+    ...new Set(
+      (data ?? [])
+        .map((row) => String(row.category ?? '').trim())
+        .filter(Boolean),
+    ),
+  ].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 }
 
 /**

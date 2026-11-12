@@ -26,3 +26,42 @@ export function buildRecipeSnapshot(recipe, fallbackId = '', fallbackTitle = '')
     imageSourceUrl: recipe?.imageSourceUrl || '',
   }
 }
+
+/**
+ * Reconstrói o contrato de receita usado pela interface a partir de um
+ * snapshot persistido. O snapshot é a fonte de verdade; as colunas de
+ * fallback existem para linhas antigas ou incompletas.
+ */
+export function normalizeRecipeSnapshot(snapshot, fallback = {}) {
+  const safeSnapshot =
+    snapshot && typeof snapshot === 'object' ? snapshot : {}
+  const usedIngredients = Array.isArray(safeSnapshot.usedIngredients)
+    ? safeSnapshot.usedIngredients
+    : []
+  const missedIngredients = Array.isArray(safeSnapshot.missedIngredients)
+    ? safeSnapshot.missedIngredients
+    : []
+  const readyInMinutes = Number(safeSnapshot.readyInMinutes ?? 0)
+
+  return {
+    ...safeSnapshot,
+    id: safeSnapshot.id || fallback.id || '',
+    title: safeSnapshot.title || fallback.title || 'Receita sem nome',
+    image: safeSnapshot.image || fallback.image || '',
+    category: safeSnapshot.category || 'outros',
+    readyInMinutes,
+    servings: Number(safeSnapshot.servings ?? 0),
+    caloriesPerServing: Number(safeSnapshot.caloriesPerServing ?? 0),
+    time:
+      readyInMinutes > 0
+        ? `${readyInMinutes} min`
+        : 'Tempo não informado',
+    usedIngredients,
+    missedIngredients,
+    usedIngredientCount: usedIngredients.length,
+    missedIngredientCount: missedIngredients.length,
+    ingredients: `${usedIngredients.length} ingrediente${
+      usedIngredients.length === 1 ? '' : 's'
+    } da despensa`,
+  }
+}
