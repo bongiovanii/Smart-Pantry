@@ -64,7 +64,7 @@ const sidebarItems = [
   },
   {
     id: 'compras',
-    label: 'Lista de compras',
+    label: 'Minha lista de compras',
     icon: 'shopping_cart',
     view: 'lista-de-compras',
   },
