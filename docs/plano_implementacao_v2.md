@@ -164,3 +164,8 @@ Substituir a grade estática de mock da semana por um cronograma real armazenado
 2. **Incremento 1.2:** Fase 2 (Modal de Detalhes da Receita via Gemini) — prepara a visualização e a base para a ação de cozinhar.
 3. **Incremento 1.3:** Fase 3 (Tabela `stock_movements` e Ação de Consumo) — conecta a receita ao estoque real.
 4. **Incremento 1.4:** Fase 4 (Planejamento Semanal Persistente) — consolida a organização da rotina do usuário.
+
+---
+
+> [!NOTE]
+> **Continuidade:** as fases 5 a 11 estão planejadas em [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões registradas em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e os testes em [`plano_testes.md`](./plano_testes.md). A ordem aprovada é **7 → 5 → 6 → 8 → 9 → 11 → 10**.
