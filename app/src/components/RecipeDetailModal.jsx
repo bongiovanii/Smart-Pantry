@@ -4,7 +4,7 @@ import { useEffect, useId } from 'react'
 // chegam embutidos no objeto recipe retornado pela Edge Function.
 // Não há necessidade de uma segunda requisição para buscar detalhes.
 
-function RecipeDetailModal({ isOpen, recipe, onClose, onCook }) {
+function RecipeDetailModal({ isOpen, recipe, onClose, onCook, onPlan }) {
   const titleId = useId()
 
   useEffect(() => {
@@ -204,13 +204,24 @@ function RecipeDetailModal({ isOpen, recipe, onClose, onCook }) {
         </div>
 
         {/* Rodapé com Ações */}
-        <div className="flex items-center justify-end gap-3 border-t border-outline-variant bg-surface-container-low/50 px-5 py-4 sm:px-6">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-outline-variant bg-surface-container-low/50 px-5 py-4 sm:gap-3 sm:px-6">
           <button
             className="rounded-xl border border-outline-variant bg-white px-4 py-2.5 text-sm font-bold text-on-surface transition hover:bg-surface-container"
             onClick={onClose}
             type="button"
           >
             Fechar
+          </button>
+
+          <button
+            className="flex items-center gap-2 rounded-xl border border-primary/30 bg-white px-4 py-2.5 text-sm font-bold text-primary transition hover:bg-secondary-container"
+            onClick={() => onPlan?.(recipe)}
+            type="button"
+          >
+            <span className="material-symbols-outlined text-lg">
+              calendar_month
+            </span>
+            Planejar
           </button>
 
           <button

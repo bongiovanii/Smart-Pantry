@@ -1,10 +1,20 @@
 # Smart Pantry — Estado atual do projeto
 
-**Data de atualização:** 08 de novembro de 2026
+**Data de atualização:** 11 de novembro de 2026
 
-**Fase atual:** base técnica concluída, CRUD da despensa, integração de receitas com IA, registro de consumo de receitas (Fase 3), histórico “Minhas receitas” por usuário e autenticação com Google implementados.
+**Versão do documento:** 1.1
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_3.md`](./ESCOPO_INCREMENTO_3.md) — histórico de receitas, autenticação Google e deploy público.
+**Fase atual:** base técnica concluída, CRUD da despensa, integração de receitas com IA, registro de consumo de receitas (Fase 3), histórico “Minhas receitas” por usuário, autenticação com Google e planejamento semanal persistente (Fase 4) implementados.
+
+**Incremento documentado:** [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md) — planejamento semanal persistente. O incremento anterior permanece em [`ESCOPO_INCREMENTO_3.md`](./ESCOPO_INCREMENTO_3.md).
+
+## Histórico de versões deste documento
+
+| Versão | Data | Alteração registrada |
+|---|---|---|
+| 1.0 | 08/11/2026 | Consolidação do estado após o Incremento 3: histórico de receitas, autenticação com Google, deploy público, correção do 502 e kcal nas receitas. |
+| 1.1 | 11/11/2026 | Fase 4 concluída: planejamento semanal persistente, tabela `meal_plans`, serviço e componentes de agendamento, snapshot compartilhado de receita, verificação formal da feature de kcal, aplicação das migrações pendentes e republicação da Edge Function. |
+
 
 ## 1. Finalidade deste documento
 
@@ -96,9 +106,9 @@ Já estão presentes na interface:
 - navegação inferior para celular;
 - área de cadastro e visualização da despensa;
 - seção de sugestões de receitas;
-- representação inicial do planejamento semanal.
+- planejamento semanal persistente, com slots por dia e tipo de refeição.
 
-O planejamento semanal permanece demonstrativo e ainda não possui persistência ou regras de negócio.
+O planejamento semanal deixou de ser demonstrativo: as refeições são gravadas em `meal_plans` e restauradas quando o usuário volta à aplicação.
 
 ### 5.2 Autenticação e sessão de usuário
 
@@ -218,6 +228,30 @@ A navegação lateral passou a exibir **Minhas receitas** no lugar do antigo ata
 
 A tabela usa RLS por `user_id`, de modo que cada sessão lê e registra apenas as próprias receitas. Como o snapshot é gravado na mesma transação do consumo, não existe caso de receita contabilizada sem baixa no estoque nem de consumo sem entrada no histórico.
 
+### 5.13 Planejamento semanal persistente (Fase 4)
+
+A seção **Sua semana** deixou de usar dados fixos e passou a representar o planejamento real do usuário:
+
+- cada refeição é gravada em `meal_plans` com dia da semana (`SEG` a `DOM`), tipo de refeição (`Café da manhã`, `Almoço`, `Lanche` ou `Jantar`) e o snapshot completo da receita;
+- existe no máximo uma receita por dia e tipo de refeição; ao reagendar o mesmo slot, o prato anterior é substituído por `upsert`;
+- o usuário pode planejar a partir do botão **Planejar** no modal de detalhes, do atalho de calendário no card da receita ou do botão **+** de cada coluna da semana;
+- cada cartão da semana abre o modal de detalhes com os dados salvos, sem nova chamada ao Gemini, e oferece um botão para remover a refeição do slot;
+- o planejamento é carregado na abertura da aplicação e permanece disponível após recarregar a página ou trocar de dispositivo;
+- a interface exibe estados de carregamento, erro com tentativa de recarregamento e a contagem de refeições planejadas.
+
+O modal de agendamento permite escolher dia, refeição e, quando aberto pelo botão **+** da semana, uma das receitas sugeridas atualmente carregadas.
+
+### 5.14 Informação nutricional nas receitas
+
+O prompt do chef brasileiro passou a estimar `caloriesPerServing` (kcal por porção) e a devolver o valor no JSON estruturado. A informação aparece:
+
+- como selo no card da receita sugerida;
+- como métrica no modal de detalhes;
+- no inventário e nos cartões de **Minhas receitas**;
+- no snapshot salvo em `user_recipes` e em `meal_plans`.
+
+Quando o modelo não informa o valor, o campo é armazenado como zero/nulo e a interface simplesmente o oculta.
+
 ## 6. Organização atual dos principais componentes
 
 | Elemento | Responsabilidade no sistema |
@@ -227,6 +261,8 @@ A tabela usa RLS por `user_id`, de modo que cada sessão lê e registra apenas a
 | `LoginScreen.jsx` | Oferece o login/cadastro com Google e trata carregamento e erros do OAuth. |
 | `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa e “Minhas receitas” e coordena o registro de consumo. |
 | `MyRecipesPage.jsx` | Exibe o inventário, a busca e a linha do tempo das receitas executadas pelo usuário. |
+| `WeekPlanner.jsx` | Renderiza a grade semanal persistente, com adicionar, abrir e remover refeições. |
+| `PlanMealModal.jsx` | Permite escolher dia, tipo de refeição e receita antes de gravar o slot. |
 | `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente. |
 | `RecipeDetailModal.jsx` | Exibe ingredientes, tempo, porções e modo de preparo da receita. |
 | `CookRecipeModal.jsx` | Confirma quais itens da despensa serão consumidos e em que quantidade. |
@@ -236,6 +272,9 @@ A tabela usa RLS por `user_id`, de modo que cada sessão lê e registra apenas a
 | `pantry.js` | Executa os casos de consulta e cadastro da despensa. |
 | `movements.js` | Registra o consumo dos ingredientes e o snapshot da receita via RPC transacional. |
 | `userRecipes.js` | Consulta o histórico de receitas do usuário e normaliza os snapshots salvos. |
+| `mealPlan.js` (serviço) | Lista, agenda/substitui e remove refeições do planejamento semanal. |
+| `mealPlan.js` (lib) | Define dias da semana, rótulos e tipos de refeição aceitos pelo banco. |
+| `recipeSnapshot.js` | Monta o snapshot compartilhado de receita usado pelo consumo e pelo planejamento. |
 | `recipe.js` | Define o contrato entre a aplicação e o serviço de receitas. |
 | `supabase.js` | Centraliza a criação do cliente Supabase com persistência e PKCE. |
 | `auth.js` | Centraliza login Google, logout, sessão e dados do perfil. |
@@ -245,6 +284,8 @@ A tabela usa RLS por `user_id`, de modo que cada sessão lê e registra apenas a
 | Migração inicial | Cria tabelas, relacionamentos, validações, índices e políticas de segurança. |
 | Migração da Fase 3 | Adiciona `status` a `pantry_items` e a função transacional de consumo. |
 | Migração do histórico | Cria `user_recipes` com RLS e amplia a RPC para gravar o snapshot da receita na mesma transação. |
+| Migração de calorias | Adiciona `calories_per_serving` ao histórico e amplia a RPC de consumo. |
+| Migração do planejamento | Cria `meal_plans` com RLS, restrição de slot único e snapshot da receita. |
 
 ## 7. Decisões de engenharia já adotadas
 
@@ -307,7 +348,7 @@ Essa distinção será usada quando os requisitos forem revisados.
 | Movimentação de estoque | Implementada (consumo) | Consumo total/parcial de receitas grava em `stock_movements` e atualiza a despensa de forma transacional. |
 | Histórico “Minhas receitas” | Implementado | Tabela `user_recipes` com RLS, inventário agrupado, busca e linha do tempo por usuário. |
 | Alertas de validade | Planejados | Ainda não existe regra ativa ou central de alertas. |
-| Planejamento semanal | Demonstrativo | Interface sem persistência. |
+| Planejamento semanal | Implementado (Fase 4) | Slots persistentes por dia e tipo de refeição, com snapshot da receita, substituição e remoção. |
 | Código de barras/Open Food Facts | Fora do escopo atual | Previsto para evolução futura. |
 | PWA/offline | Planejada | Ainda não configurada. |
 | Empacotamento mobile | Planejado | Capacitor será avaliado depois do MVP web. |
@@ -318,7 +359,9 @@ Essa distinção será usada quando os requisitos forem revisados.
 - A tabela `stock_movements` recebe os consumos de receitas, mas ainda não possui tela própria de histórico; o histórico visível hoje é o de receitas executadas.
 - Ainda não é possível registrar um descarte e seu motivo.
 - Os alertas de validade não foram implementados.
-- O planejamento semanal ainda é uma representação visual.
+- O planejamento semanal é recorrente e não possui data inicial, histórico de semanas ou visão mensal.
+- Cada slot do planejamento aceita apenas uma receita; prato principal e acompanhamento exigem slots separados ou uma receita combinada.
+- Não existe lista de compras automática a partir dos ingredientes faltantes do planejamento.
 - A configuração do provider Google no Supabase ainda depende do Client ID e do Client Secret gerados no Google Cloud Console.
 - O login com Google exige que a URL de produção seja adicionada às origens autorizadas e às Redirect URLs do Supabase após o deploy.
 - O botão para descobrir mais receitas e a ação de favoritar ainda não possuem fluxo completo.
@@ -344,10 +387,16 @@ Durante a implementação foram realizados os seguintes controles:
 - execução do ESLint e do build do Vite após a implementação da Fase 3, sem erros;
 - teste unitário manual da correspondência de nomes (acentos, maiúsculas e plural) usada no consumo de receitas;
 - execução do ESLint e do build do Vite após a implementação de “Minhas receitas”, sem erros;
-- verificação da tabela `user_recipes` e da nova assinatura da RPC de consumo por meio de sessão autenticada.
+- verificação da tabela `user_recipes` e da nova assinatura da RPC de consumo por meio de sessão autenticada;
+- verificação formal da feature de kcal: campo `caloriesPerServing` no prompt e no schema da Edge Function, no card (`FeatureCard`), no modal (`RecipeDetailModal`), no inventário (`MyRecipesPage`) e na migration de persistência;
+- execução do ESLint e do build do Vite após a implementação da Fase 4, sem erros;
+- revisão do contrato entre `meal_plans`, `services/mealPlan.js`, `WeekPlanner` e `PlanMealModal`;
+- aplicação das migrações `20261108200000_recipe_calories.sql` e `20261111234500_meal_plans.sql` no projeto remoto, confirmada por `supabase migration list --remote`;
+- republicação da Edge Function `recipe-suggestions` em 11/11/2026, garantindo em produção o prompt com `caloriesPerServing` e o fallback entre modelos do Gemini;
+- smoke test via PostgREST: `meal_plans` e `user_recipes` existem e respondem `42501` (permission denied) para `anon`, confirmando tabelas presentes e grants corretos.
 
 > [!NOTE]
-> As migrações `20261108120000_stock_movements_consumption.sql` e `20261108160000_user_recipes.sql` foram aplicadas no projeto Supabase remoto em 08/11/2026. Smoke tests confirmaram que a função e a tabela respondem às validações via RLS para usuários autenticados.
+> Todas as migrações locais estão sincronizadas com o projeto Supabase remoto em 11/11/2026: inicial, imagens, consumo, histórico, calorias e planejamento semanal. A migração de calorias estava pendente desde 08/11/2026 e foi aplicada junto com a da Fase 4. A Edge Function também foi publicada novamente na mesma data.
 
 Essas verificações demonstram o funcionamento técnico dos fluxos atuais. Elas não substituem a avaliação com usuários nem a medição de redução do desperdício.
 
@@ -357,12 +406,11 @@ A sequência deverá ser escolhida conforme o backlog e o tempo do projeto. A ev
 
 1. completar o registro de entrada, ajuste e descarte em `stock_movements`;
 2. criar a tela de histórico de movimentações e consolidar o saldo a partir delas;
-3. configurar o provider Google no Supabase e validar o login em produção;
-4. criar alertas derivados da data de validade;
-5. transformar o planejamento semanal em uma funcionalidade persistente;
-6. preparar dados para medir consumo e desperdício;
-7. avaliar PWA, funcionamento offline e empacotamento mobile;
-8. revisar os requisitos com base no software consolidado.
+3. criar alertas derivados da data de validade;
+4. derivar uma lista de compras dos ingredientes faltantes do planejamento semanal;
+5. preparar dados para medir consumo e desperdício;
+6. avaliar PWA, funcionamento offline e empacotamento mobile;
+7. revisar os requisitos com base no software consolidado.
 
 Essa lista orienta o desenvolvimento, mas não representa ainda uma especificação definitiva.
 

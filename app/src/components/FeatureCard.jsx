@@ -6,6 +6,7 @@ function FeatureCard({
   image,
   imageSource,
   onClick,
+  onPlan,
 }) {
   return (
     <article
@@ -40,6 +41,20 @@ function FeatureCard({
             {caloriesPerServing} kcal
           </span>
         )}
+        <button
+          className="absolute right-14 top-2 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface-variant shadow-sm backdrop-blur transition hover:text-primary"
+          aria-label={`Adicionar ${title} ao planejamento`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onPlan?.()
+          }}
+          title="Adicionar ao planejamento"
+          type="button"
+        >
+          <span className="material-symbols-outlined text-xl">
+            calendar_month
+          </span>
+        </button>
         <button
           className="absolute right-2 top-2 grid h-9 w-9 place-items-center rounded-full bg-white/90 text-on-surface-variant shadow-sm backdrop-blur transition hover:text-primary"
           aria-label={`Favoritar ${title}`}

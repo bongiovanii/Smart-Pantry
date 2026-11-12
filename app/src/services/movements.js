@@ -1,3 +1,4 @@
+import { buildRecipeSnapshot } from '../lib/recipeSnapshot.js'
 import { getCurrentSession } from '../lib/session.js'
 import { supabase } from '../lib/supabase.js'
 
@@ -41,32 +42,6 @@ function normalizeItems(items) {
       quantity,
     }
   })
-}
-
-/**
- * Monta o snapshot salvo em user_recipes. Guardar os campos necessários para
- * renderizar a receita novamente evita depender do Gemini para abrir o
- * histórico em "Minhas receitas".
- */
-function buildRecipeSnapshot(recipe, fallbackId, fallbackTitle) {
-  return {
-    id: recipe?.id || fallbackId || '',
-    title: String(recipe?.title ?? fallbackTitle ?? '').trim(),
-    image: recipe?.image || '',
-    category: recipe?.category || '',
-    readyInMinutes: recipe?.readyInMinutes ?? 0,
-    servings: recipe?.servings ?? 0,
-    caloriesPerServing: recipe?.caloriesPerServing ?? 0,
-    usedIngredients: recipe?.usedIngredients ?? [],
-    missedIngredients: recipe?.missedIngredients ?? [],
-    steps: recipe?.steps ?? [],
-    imageQuery: recipe?.imageQuery || '',
-    imageSource: recipe?.imageSource || '',
-    imageAuthor: recipe?.imageAuthor || '',
-    imageLicense: recipe?.imageLicense || '',
-    imageLicenseUrl: recipe?.imageLicenseUrl || '',
-    imageSourceUrl: recipe?.imageSourceUrl || '',
-  }
 }
 
 /**

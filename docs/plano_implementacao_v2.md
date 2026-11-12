@@ -10,7 +10,7 @@ Este plano detalha o passo a passo técnico para implementar as quatro funcional
 flowchart LR
     Fase1["Fase 1: Edição e Exclusão<br/>(CRUD Despensa - Concluída)"] --> Fase2["Fase 2: Motor de Receitas com IA<br/>(Google AI Studio / Gemini API)"]
     Fase2 --> Fase3["Fase 3: Movimentações e Consumo<br/>(stock_movements)"]
-    Fase3 --> Fase4["Fase 4: Planejamento Semanal<br/>(meal_plans)"]
+    Fase3 --> Fase4["Fase 4: Planejamento Semanal<br/>(meal_plans - Concluída)"]
 ```
 
 ---
@@ -147,9 +147,14 @@ Substituir a grade estática de mock da semana por um cronograma real armazenado
    - Na seção "Sua semana", renderizar os slots reais. Se preenchido, exibir nome, tipo de refeição e botão para remover ou ver detalhes da receita.
 
 ### 4.3 Critérios de Pronto
-- [ ] Usuário pode agendar qualquer receita sugerida para um dia e refeição específicos.
-- [ ] O planejamento persiste no banco após recarregar a página.
-- [ ] Usuário pode desmarcar ou substituir uma refeição da semana.
+- [x] Usuário pode agendar qualquer receita sugerida para um dia e refeição específicos.
+- [x] O planejamento persiste no banco após recarregar a página.
+- [x] Usuário pode desmarcar ou substituir uma refeição da semana.
+
+> [!NOTE]
+> **Implementado em 11/11/2026.** A migração [`20261111234500_meal_plans.sql`](file:///home/gustavo-bongiovani/Documentos/GitHub/Smart-Pantry/supabase/migrations/20261111234500_meal_plans.sql) cria `meal_plans` com RLS e restrição única por `(user_id, day_of_week, meal_type)`. O snapshot completo da receita é salvo em `recipe_snapshot`, permitindo abrir o modal sem nova chamada ao Gemini. A interface ganhou `WeekPlanner.jsx`, `PlanMealModal.jsx`, botão **Planejar** no modal e atalho de calendário no card. Detalhes em [`ESCOPO_INCREMENTO_4.md`](./ESCOPO_INCREMENTO_4.md).
+>
+> **Pendente de deploy:** a migração foi aplicada no projeto remoto em 11/11/2026 (junto com a migração de calorias). Falta publicar o frontend atualizado.
 
 ---
 

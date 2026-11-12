@@ -3,11 +3,19 @@ import AppHeader from '../components/AppHeader.jsx'
 import CookRecipeModal from '../components/CookRecipeModal.jsx'
 import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
+import PlanMealModal from '../components/PlanMealModal.jsx'
 import RecipeDetailModal from '../components/RecipeDetailModal.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
+import WeekPlanner from '../components/WeekPlanner.jsx'
 import MyRecipesPage from './MyRecipesPage.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
+import { getDayLabel } from '../lib/mealPlan.js'
+import {
+  assignMealToDay,
+  listWeeklyPlan,
+  removeMealPlan,
+} from '../services/mealPlan.js'
 import { consumeRecipeIngredients } from '../services/movements.js'
 import {
   archivePantryItem,
@@ -17,16 +25,6 @@ import {
 } from '../services/pantry.js'
 import { listRecipesByIngredients } from '../services/recipe.js'
 
-
-const week = [
-  { day: 'SEG', meal: 'Macarrão com tomate e manjericão', type: 'Jantar' },
-  { day: 'TER' },
-  { day: 'QUA' },
-  { day: 'QUI' },
-  { day: 'SEX' },
-  { day: 'SÁB', meal: 'Salada de jardim', type: 'Almoço' },
-  { day: 'DOM' },
-]
 
 const sidebarItems = [
   {
@@ -188,6 +186,12 @@ function App({ user, onSignOut }) {
   const [isConsuming, setIsConsuming] = useState(false)
   const [consumeError, setConsumeError] = useState('')
   const [notice, setNotice] = useState('')
+  const [weeklyPlan, setWeeklyPlan] = useState([])
+  const [isPlanLoading, setIsPlanLoading] = useState(true)
+  const [planLoadError, setPlanLoadError] = useState('')
+  const [planTarget, setPlanTarget] = useState(null)
+  const [isPlanning, setIsPlanning] = useState(false)
+  const [planSubmitError, setPlanSubmitError] = useState('')
 
   async function loadIngredients() {
     setIsLoading(true)
@@ -199,6 +203,21 @@ function App({ user, onSignOut }) {
       setLoadError(error.message || 'Não foi possível carregar a despensa.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function loadWeeklyPlan() {
+    setIsPlanLoading(true)
+    setPlanLoadError('')
+
+    try {
+      setWeeklyPlan(await listWeeklyPlan())
+    } catch (error) {
+      setPlanLoadError(
+        error.message || 'Não foi possível carregar o planejamento semanal.',
+      )
+    } finally {
+      setIsPlanLoading(false)
     }
   }
 
@@ -220,6 +239,34 @@ function App({ user, onSignOut }) {
       })
 
     // Impede atualizações de estado caso o componente seja desmontado.
+    return () => {
+      isActive = false
+    }
+  }, [])
+
+  // Carrega o planejamento semanal salvo do usuário.
+  useEffect(() => {
+    let isActive = true
+
+    listWeeklyPlan()
+      .then((entries) => {
+        if (isActive) {
+          setWeeklyPlan(entries)
+          setPlanLoadError('')
+        }
+      })
+      .catch((error) => {
+        if (isActive) {
+          setPlanLoadError(
+            error.message ||
+              'Não foi possível carregar o planejamento semanal.',
+          )
+        }
+      })
+      .finally(() => {
+        if (isActive) setIsPlanLoading(false)
+      })
+
     return () => {
       isActive = false
     }
@@ -343,6 +390,65 @@ function App({ user, onSignOut }) {
         window.scrollTo({ top: 0, behavior: 'smooth' })
       }
     }, 0)
+  }
+
+  function handlePlanRecipe(recipe) {
+    setSelectedRecipe(null)
+    setPlanSubmitError('')
+    setPlanTarget({ recipe })
+  }
+
+  function handleAddMeal(dayOfWeek) {
+    setPlanSubmitError('')
+    setPlanTarget({ dayOfWeek })
+  }
+
+  async function handleConfirmPlan({ dayOfWeek, mealType, recipe }) {
+    setIsPlanning(true)
+    setPlanSubmitError('')
+
+    try {
+      const saved = await assignMealToDay({ dayOfWeek, mealType, recipe })
+
+      // Substitui apenas o slot salvo, preservando as demais refeições.
+      setWeeklyPlan((current) => [
+        ...current.filter(
+          (entry) =>
+            !(
+              entry.dayOfWeek === saved.dayOfWeek &&
+              entry.mealType === saved.mealType
+            ),
+        ),
+        saved,
+      ])
+      setPlanTarget(null)
+      setNotice(
+        `"${saved.recipe.title}" adicionada ao planejamento de ${getDayLabel(
+          saved.dayOfWeek,
+        )} (${saved.mealType}).`,
+      )
+    } catch (error) {
+      setPlanSubmitError(
+        error.message ||
+          'Não foi possível salvar a refeição no planejamento.',
+      )
+    } finally {
+      setIsPlanning(false)
+    }
+  }
+
+  async function handleRemoveMeal(entry) {
+    try {
+      await removeMealPlan(entry.planId)
+      setWeeklyPlan((current) =>
+        current.filter((item) => item.planId !== entry.planId),
+      )
+      setNotice(`"${entry.recipe.title}" removida do planejamento.`)
+    } catch (error) {
+      alert(
+        error.message || 'Não foi possível remover a refeição do planejamento.',
+      )
+    }
   }
 
   function handleCookRecipe(recipe) {
@@ -569,6 +675,7 @@ function App({ user, onSignOut }) {
                 <FeatureCard
                   key={recipe.id}
                   onClick={() => setSelectedRecipe(recipe)}
+                  onPlan={() => handlePlanRecipe(recipe)}
                   {...recipe}
                 />
               ))}
@@ -613,39 +720,15 @@ function App({ user, onSignOut }) {
             </div>
           </section>
 
-          <section id="planejamento" className="mt-9 lg:mt-12">
-            <div className="mb-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary/70">
-                Sua semana
-              </p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-primary sm:text-3xl">
-                Planejamento semanal
-              </h2>
-            </div>
-
-            <div className="week-grid">
-              {week.map(({ day, meal, type }) => (
-                <article className="day-column" key={day}>
-                  <p className="border-b border-primary/10 pb-2 text-center text-xs font-bold tracking-widest text-on-surface-variant">
-                    {day}
-                  </p>
-                  {meal ? (
-                    <button className="flex min-h-24 flex-1 flex-col justify-between rounded-xl border border-secondary-container bg-secondary-container/50 p-3 text-left transition hover:border-primary/40">
-                      <span className="text-sm font-semibold leading-5">{meal}</span>
-                      <span className="mt-3 text-xs font-bold text-primary">{type}</span>
-                    </button>
-                  ) : (
-                    <button
-                      className="grid min-h-24 flex-1 place-items-center rounded-xl border border-dashed border-outline-variant bg-surface text-outline transition hover:bg-surface-container-low hover:text-primary"
-                      aria-label={`Adicionar refeição para ${day}`}
-                    >
-                      <span className="material-symbols-outlined">add</span>
-                    </button>
-                  )}
-                </article>
-              ))}
-            </div>
-          </section>
+          <WeekPlanner
+            error={planLoadError}
+            isLoading={isPlanLoading}
+            onAddMeal={handleAddMeal}
+            onOpenRecipe={setSelectedRecipe}
+            onRemoveMeal={handleRemoveMeal}
+            onRetry={loadWeeklyPlan}
+            plan={weeklyPlan}
+          />
             </>
           )}
         </main>
@@ -709,6 +792,7 @@ function App({ user, onSignOut }) {
           isOpen={true}
           onClose={() => setSelectedRecipe(null)}
           onCook={handleCookRecipe}
+          onPlan={handlePlanRecipe}
           recipe={selectedRecipe}
         />
       )}
@@ -726,6 +810,23 @@ function App({ user, onSignOut }) {
           onConfirm={handleConfirmCook}
           pantryItems={ingredients}
           recipe={cookRecipe}
+        />
+      )}
+
+      {planTarget && (
+        <PlanMealModal
+          dayOfWeek={planTarget.dayOfWeek}
+          error={planSubmitError}
+          isOpen={true}
+          isSubmitting={isPlanning}
+          onClose={() => {
+            if (isPlanning) return
+            setPlanTarget(null)
+            setPlanSubmitError('')
+          }}
+          onConfirm={handleConfirmPlan}
+          recipe={planTarget.recipe ?? null}
+          recipes={recipes}
         />
       )}
 
