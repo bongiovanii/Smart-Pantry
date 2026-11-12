@@ -18,7 +18,6 @@ import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
 import { normalizeRecipeTitle } from '../lib/recipeNormalization.js'
-import { mergeRecipeLists } from '../lib/recipeRecord.js'
 import {
   assignMealToDay,
   listWeeklyPlan,
@@ -812,7 +811,7 @@ function App({ user, onSignOut }) {
       })
 
       if (result.recipes?.length) {
-        setRecipes((current) => mergeRecipeLists(result.recipes, current))
+        setRecipes(result.recipes)
       }
       setRecipeMeta(result)
 
@@ -1241,7 +1240,7 @@ function App({ user, onSignOut }) {
           }}
           onRecipesGenerated={(generated, meta) => {
             if (generated?.length) {
-              setRecipes((current) => mergeRecipeLists(current, generated))
+              setRecipes(generated)
             }
             if (meta) setRecipeMeta(meta)
           }}
