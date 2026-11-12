@@ -82,3 +82,29 @@ export async function archivePantryItem(id) {
 
   return data
 }
+
+export async function recordPantryEntry(
+  itemId,
+  { quantity, reason = 'Reposição' } = {},
+) {
+  await getCurrentSession()
+
+  if (!itemId) {
+    throw new Error('Alimento não informado.')
+  }
+
+  const parsedQty = Number(quantity)
+  if (!parsedQty || parsedQty <= 0) {
+    throw new Error('A quantidade de reposição deve ser maior que zero.')
+  }
+
+  const { data, error } = await supabase.rpc('record_pantry_entry', {
+    p_item_id: itemId,
+    p_quantity: parsedQty,
+    p_reason: reason || 'Reposição',
+  })
+
+  if (error) throw error
+
+  return data
+}

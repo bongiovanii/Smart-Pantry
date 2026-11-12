@@ -2,9 +2,9 @@
 
 **Data:** 12 de novembro de 2026
 
-**Versão:** 1.3
+**Versão:** 1.4
 
-**Status:** em execução; Fases 7, 5 e 10 concluídas em 12/11/2026; fases 6, 8, 9 e 11 planejadas; Fase 6 (Favoritas) é a próxima.
+**Status:** em execução; Fases 7, 5, 10 e 9 concluídas em 12/11/2026; fases 6, 8 e 11 planejadas; Fase 6 (Favoritas) é a próxima.
 
 **Documentos relacionados:**
 - [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) — perguntas e respostas que orientam este plano.
@@ -699,13 +699,13 @@ score = 0,6 * frequência_normalizada + 0,4 * volume_entrada_normalizado
 
 ### 9.6 Critérios de pronto
 
-- [ ] Todo item novo ou reposto gera `stock_movements` do tipo `entry`.
-- [ ] A lista sugere itens com base em frequência e volume dos últimos 90 dias.
-- [ ] Itens faltantes do planejamento aparecem em seção separada.
-- [ ] É possível adicionar, editar, remover e marcar itens como comprados.
-- [ ] Marcar como comprado oferece entrada na despensa com quantidade editável.
-- [ ] A lista persiste entre sessões e respeita RLS.
-- [ ] Testes unitários da agregação e build passam.
+- [x] Todo item novo ou reposto gera `stock_movements` do tipo `entry`.
+- [x] A lista sugere itens com base em frequência e volume dos últimos 90 dias.
+- [x] Itens faltantes do planejamento aparecem em seção separada.
+- [x] É possível adicionar, editar, remover e marcar itens como comprados.
+- [x] Marcar como comprado oferece entrada na despensa com quantidade editável.
+- [x] A lista persiste entre sessões e respeita RLS.
+- [x] Testes unitários da agregação e build passam.
 
 ---
 

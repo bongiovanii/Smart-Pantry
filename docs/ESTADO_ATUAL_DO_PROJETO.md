@@ -2,11 +2,11 @@
 
 **Data de atualização:** 12 de novembro de 2026
 
-**Versão do documento:** 2.3
+**Versão do documento:** 2.4
 
-**Fase atual:** fases 1 a 5, Fase 7 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, notificações de vencimento e central de configurações). As fases 6, 8, 9 e 11 estão planejadas; a Fase 6 (Favoritas) é a próxima.
+**Fase atual:** fases 1 a 5, Fase 7, Fase 9 e Fase 10 concluídas (despensa, receitas com IA, consumo, planejamento semanal persistente com templates/ciclo/histórico, biblioteca de receitas, geração cache-first, notificações de vencimento, central de configurações, e minha lista de compras com reposição). As fases 6, 8 e 11 estão planejadas; a Fase 6 (Favoritas) é a próxima.
 
-**Incremento documentado:** [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md) — notificações de vencimento e central de configurações. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
+**Incremento documentado:** [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md) — lista de compras e fluxo de reposição. Os incrementos anteriores permanecem em [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md), [`ESCOPO_INCREMENTO_6.md`](./ESCOPO_INCREMENTO_6.md) e [`ESCOPO_INCREMENTO_5.md`](./ESCOPO_INCREMENTO_5.md).
 
 **Planejamento vigente:** [`plano_implementacao_v3.md`](./plano_implementacao_v3.md), com as decisões em [`DECISOES_DE_PROJETO.md`](./DECISOES_DE_PROJETO.md) e a estratégia de qualidade em [`plano_testes.md`](./plano_testes.md).
 
@@ -21,6 +21,7 @@
 | 2.1 | 12/11/2026 | Fase 7 implementada: tabelas `recipes` e `recipe_generations`, Edge Function cache-first com JWT, limite diário de 10 gerações, modal “Descobrir mais receitas”, normalização compartilhada e 16 testes unitários com Vitest. Migração aplicada, Edge Function e frontend publicados; validação autenticada final pendente. |
 | 2.2 | 12/11/2026 | Fase 5 implementada: tabelas `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items` e `meal_plan_weeks`, evolução de `meal_plans` com `week_start`, 7 RPCs transacionais, página `PlanningPage.jsx` completa, modais de templates e histórico, validação de validade futura na despensa, e 44 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 | 2.3 | 12/11/2026 | Fase 10 implementada: tabelas `user_settings` e `notifications`, RPCs `generate_expiration_notifications`, `snooze_notification`, `mark_all_notifications_as_read` e `get_or_create_user_settings`, componentes `NotificationsPanel`, `SettingsPage`, badge de não lidas no `AppHeader`, atalho de configurações na navegação, e 52 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
+| 2.4 | 12/11/2026 | Fase 9 implementada: tabela `shopping_list_items`, RPCs `record_pantry_entry`, `create_pantry_item_with_entry`, `mark_shopping_item_purchased` e `get_shopping_suggestions`, tela `ShoppingListPage.jsx`, modais `ShoppingItemModal`, `PurchaseItemModal` e `PantryEntryModal`, aba de lista de compras na navegação principal e 62 testes unitários com Vitest. Migração aplicada remotamente no Supabase. |
 
 
 ## 1. Finalidade deste documento
@@ -278,7 +279,7 @@ A ordem de execução definida é **7 → 5 → 6 → 8 → 9 → 11 → 10**, p
 | 5 | Aba de planejamento com até 4 templates, ciclo de 4 semanas e histórico | Fase 7 | Implementada em 12/11/2026 |
 | 6 | Favoritas com snapshot e abas em “Minhas receitas” | Fase 7 | Planejada (próxima) |
 | 8 | Aba Configurações com dark mode | — | Planejada |
-| 9 | Fluxo de entrada/reposição + aba “Minha lista de compras” | Fase 5 e histórico de movimentações | Planejada |
+| 9 | Fluxo de entrada/reposição + aba “Minha lista de compras” | Fase 5 e histórico de movimentações | Implementada em 12/11/2026 |
 | 11 | Chatbot Smart Chef (stretch) | Fases 7 e 9 | Planejada (stretch) |
 | 10 | Notificações de vencimento in-app (stretch) | — | Implementada em 12/11/2026 |
 
@@ -327,6 +328,16 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 - **Central de configurações:** `SettingsPage.jsx` com toggle interativo para ligar ou desligar notificações de vencimento, dados da conta Google e botão de logout.
 - O detalhamento completo está em [`ESCOPO_INCREMENTO_7.md`](./ESCOPO_INCREMENTO_7.md).
 
+### 5.19 Minha lista de compras e fluxo de reposição (Fase 9)
+
+A Fase 9 implementou a gestão de compras inteligente e o fluxo de reposição na despensa:
+- **Tabela `shopping_list_items`:** armazena itens pendentes, comprados ou removidos com constraint única parcial por usuário, nome normalizado e unidade.
+- **Sugestões inteligentes:** RPC `get_shopping_suggestions()` analisa os últimos 90 dias de consumo e reposições no estoque e sugere até 20 itens com justificativas automáticas.
+- **Integração com planejamento alimentar:** extrai automaticamente ingredientes faltantes do cardápio semanal (`recipe_snapshot.missedIngredients`) e permite adicioná-los à lista de compras em 1 clique.
+- **Compra e entrada na despensa:** `PurchaseItemModal.jsx` e a RPC `mark_shopping_item_purchased` marcam o item como comprado e, opcionalmente, debitam entrada no estoque da despensa de forma atômica.
+- **Reposição rápida:** botão "Repor" em cada alimento da despensa (`PantryEntryModal.jsx` e RPC `record_pantry_entry`) para adicionar estoque e registrar movimentação de entrada.
+- O detalhamento completo está em [`ESCOPO_INCREMENTO_8.md`](./ESCOPO_INCREMENTO_8.md).
+
 ## 6. Organização atual dos principais componentes
 
 | Elemento | Responsabilidade no sistema |
@@ -334,9 +345,10 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 | `Root.jsx` | Resolve a sessão inicial e controla o fluxo landing → login → aplicativo. |
 | `LandingPage.jsx` | Apresenta a proposta do produto e direciona para login ou criação de conta. |
 | `LoginScreen.jsx` | Oferece o login/cadastro com Google e trata carregamento e erros do OAuth. |
-| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas”, planejamento e configurações, coordena notificações, consumo e descoberta de receitas. |
+| `App.jsx` | Compõe a tela principal, controla a navegação entre a despensa, “Minhas receitas”, planejamento, lista de compras e configurações, coordena notificações, consumo e descoberta de receitas. |
 | `MyRecipesPage.jsx` | Exibe o inventário, a busca e a linha do tempo das receitas executadas pelo usuário. |
 | `PlanningPage.jsx` | Tela completa de planejamento com semana atual, templates do ciclo de 4 semanas e histórico. |
+| `ShoppingListPage.jsx` | Gestão de compras com sugestões inteligentes, faltantes do planejamento e histórico de compras. |
 | `SettingsPage.jsx` | Central de preferências do usuário (toggle de notificações, conta conectada e logout). |
 | `WeekPlanner.jsx` | Renderiza a grade semanal persistente, com adicionar, abrir e remover refeições. |
 | `PlanMealModal.jsx` | Permite escolher dia, tipo de refeição e receita antes de gravar o slot. |
@@ -345,6 +357,9 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 | `TemplateFormModal.jsx` | Criação e renomeação de templates. |
 | `TemplateItemModal.jsx` | Seleção de receita da biblioteca para slot do template. |
 | `IngredientModal.jsx` | Coleta e valida os dados do novo ingrediente (com bloqueio de datas retroativas). |
+| `PantryEntryModal.jsx` | Modal para reposição rápida de estoque a partir de um alimento da despensa. |
+| `ShoppingItemModal.jsx` | Modal para criação e edição de itens manuais na lista de compras. |
+| `PurchaseItemModal.jsx` | Modal de confirmação de compra com quantidade ajustável e entrada na despensa. |
 | `RecipeDetailModal.jsx` | Exibe ingredientes, tempo, porções e modo de preparo da receita. |
 | `CookRecipeModal.jsx` | Confirma quais itens da despensa serão consumidos e em que quantidade. |
 | `DiscoverRecipesModal.jsx` | Lista a biblioteca, busca, pagina e gera mais receitas. |
@@ -352,7 +367,8 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 | `FeatureCard.jsx` | Apresenta visualmente uma receita. |
 | `AppHeader.jsx` | Apresenta o cabeçalho, sino de notificações com badge, avatar e menu da conta com atalho para configurações. |
 | `UserAvatar.jsx` | Exibe o avatar do Google com fallback para a inicial do nome. |
-| `pantry.js` | Executa os casos de consulta e cadastro da despensa. |
+| `pantry.js` | Executa os casos de consulta, cadastro e reposição de alimentos da despensa. |
+| `shoppingList.js` | Gestão da lista de compras, sugestões automáticas e compra com entrada no estoque. |
 | `movements.js` | Registra o consumo dos ingredientes e o snapshot da receita via RPC transacional. |
 | `userRecipes.js` | Consulta o histórico de receitas do usuário e normaliza os snapshots salvos. |
 | `mealPlan.js` (serviço) | Lista, agenda/substitui e remove refeições do planejamento semanal. |
@@ -379,6 +395,7 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 | Migração da biblioteca | Cria `recipes`, `recipe_generations`, índices, RLS e a RPC `find_recipes_for_pantry`. |
 | Migração de templates | Cria `meal_plan_cycles`, `meal_plan_templates`, `meal_plan_template_items`, `meal_plan_weeks` e 7 RPCs transacionais. |
 | Migração de notificações | Cria `user_settings`, `notifications` e RPCs de geração, adiamento e leitura. |
+| Migração de compras e reposição | Cria `shopping_list_items` e RPCs `record_pantry_entry`, `create_pantry_item_with_entry`, `mark_shopping_item_purchased` e `get_shopping_suggestions`. |
 
 ### 6.1 Componentes previstos para as fases restantes do v3
 
@@ -386,8 +403,6 @@ A Fase 10 implementou os alertas in-app para alimentos que estão próximos da v
 |---|---|---|
 | `FavoriteButton.jsx` | 6 | Alterna favorito em cards, modais, histórico e planejamento. |
 | `ThemeProvider.jsx` | 8 | Aplicação de tema claro/escuro/sistema integrado a `user_settings`. |
-| `ShoppingListPage.jsx` | 9 | Sugestões, itens manuais, faltantes do planejamento e compras. |
-| `PantryEntryModal.jsx` | 9 | Registro de entrada/reposição na despensa. |
 | `SmartChefModal.jsx` | 11 | Chat com o chef, histórico, limite diário e ações estruturadas. |
 
 ## 7. Decisões de engenharia já adotadas

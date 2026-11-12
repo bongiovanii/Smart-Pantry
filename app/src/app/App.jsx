@@ -6,12 +6,14 @@ import FeatureCard from '../components/FeatureCard.jsx'
 import IngredientModal from '../components/IngredientModal.jsx'
 import PlanMealModal from '../components/PlanMealModal.jsx'
 import NotificationsPanel from '../components/NotificationsPanel.jsx'
+import PantryEntryModal from '../components/PantryEntryModal.jsx'
 import RecipeDetailModal from '../components/RecipeDetailModal.jsx'
 import UserAvatar from '../components/UserAvatar.jsx'
 import WeekPlanner from '../components/WeekPlanner.jsx'
 import MyRecipesPage from './MyRecipesPage.jsx'
 import PlanningPage from './PlanningPage.jsx'
 import SettingsPage from './SettingsPage.jsx'
+import ShoppingListPage from './ShoppingListPage.jsx'
 import { getUserEmail, getUserName } from '../lib/auth.js'
 import { formatQuantity } from '../lib/format.js'
 import { getDayLabel } from '../lib/mealPlan.js'
@@ -34,6 +36,7 @@ import {
   archivePantryItem,
   createPantryItem,
   listPantryItems,
+  recordPantryEntry,
   updatePantryItem,
 } from '../services/pantry.js'
 import { listRecipesByIngredients } from '../services/recipe.js'
@@ -58,6 +61,12 @@ const sidebarItems = [
     label: 'Planejamento',
     icon: 'calendar_month',
     view: 'planejamento',
+  },
+  {
+    id: 'compras',
+    label: 'Lista de compras',
+    icon: 'shopping_cart',
+    view: 'lista-de-compras',
   },
   {
     id: 'configuracoes',
@@ -88,6 +97,12 @@ const mobileItems = [
     view: 'planejamento',
   },
   {
+    id: 'compras',
+    label: 'Compras',
+    icon: 'shopping_cart',
+    view: 'lista-de-compras',
+  },
+  {
     id: 'configuracoes',
     label: 'Ajustes',
     icon: 'settings',
@@ -98,6 +113,7 @@ const mobileItems = [
 function isNavItemActive(item, activeView) {
   if (item.view === 'minhas-receitas') return activeView === 'minhas-receitas'
   if (item.view === 'planejamento') return activeView === 'planejamento'
+  if (item.view === 'lista-de-compras') return activeView === 'lista-de-compras'
   if (item.view === 'configuracoes') return activeView === 'configuracoes'
   return item.id === 'despensa' && activeView === 'despensa'
 }
@@ -151,7 +167,7 @@ function Sidebar({ activeView, onNavigate, onNewIngredient, user }) {
 
 function MobileNavigation({ activeView, onNavigate }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-outline-variant bg-white px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_18px_rgba(25,28,27,0.08)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-outline-variant bg-white px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-4px_18px_rgba(25,28,27,0.08)] lg:hidden">
       {mobileItems.map((item) => (
         <button
           className={`mobile-nav-item ${
@@ -212,6 +228,9 @@ function App({ user, onSignOut }) {
   const [notificationsError, setNotificationsError] = useState('')
   const [userSettings, setUserSettings] = useState(null)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
+  const [entryItem, setEntryItem] = useState(null)
+  const [isEntrySubmitting, setIsEntrySubmitting] = useState(false)
+  const [entryError, setEntryError] = useState('')
 
   async function loadIngredients() {
     setIsLoading(true)
@@ -476,6 +495,31 @@ function App({ user, onSignOut }) {
     }
   }
 
+  async function handleConfirmEntry({ quantity, reason }) {
+    if (!entryItem) return
+    setIsEntrySubmitting(true)
+    setEntryError('')
+
+    try {
+      const updated = await recordPantryEntry(entryItem.id, {
+        quantity,
+        reason,
+      })
+      setIngredients((current) =>
+        current.map((item) => (item.id === updated.id ? updated : item)),
+      )
+      setNotice(`Estoque de "${updated.name}" reposto com sucesso!`)
+      setEntryItem(null)
+      generateExpirationNotifications().then(setNotifications).catch(() => {})
+    } catch (error) {
+      setEntryError(
+        error.message || 'Não foi possível registrar a reposição.',
+      )
+    } finally {
+      setIsEntrySubmitting(false)
+    }
+  }
+
   function handleNavigate(view, sectionId) {
     setActiveView(view)
 
@@ -712,6 +756,13 @@ function App({ user, onSignOut }) {
               planContext={planContext}
               planError={planLoadError}
             />
+          ) : activeView === 'lista-de-compras' ? (
+            <ShoppingListPage
+              onGoToPantry={() => handleNavigate('despensa', 'despensa')}
+              onNotice={(msg) => setNotice(msg)}
+              pantryItems={ingredients}
+              weeklyPlan={weeklyPlan}
+            />
           ) : activeView === 'configuracoes' ? (
             <SettingsPage
               isUpdatingSettings={isUpdatingSettings}
@@ -824,6 +875,20 @@ function App({ user, onSignOut }) {
                           </p>
 
                           <div className="flex items-center gap-1">
+                            <button
+                              aria-label={`Repor ${ingredient.name}`}
+                              className="grid h-8 w-8 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-container hover:text-primary"
+                              onClick={() => {
+                                setEntryError('')
+                                setEntryItem(ingredient)
+                              }}
+                              title="Repor estoque"
+                              type="button"
+                            >
+                              <span className="material-symbols-outlined text-lg">
+                                add_shopping_cart
+                              </span>
+                            </button>
                             <button
                               aria-label={`Editar ${ingredient.name}`}
                               className="grid h-8 w-8 place-items-center rounded-lg text-on-surface-variant transition hover:bg-surface-container hover:text-primary"
@@ -1072,6 +1137,19 @@ function App({ user, onSignOut }) {
           onConfirm={handleConfirmPlan}
           recipe={planTarget.recipe ?? null}
           recipes={recipes}
+        />
+      )}
+
+      {entryItem && (
+        <PantryEntryModal
+          error={entryError}
+          isOpen={true}
+          isSubmitting={isEntrySubmitting}
+          item={entryItem}
+          onClose={() => {
+            if (!isEntrySubmitting) setEntryItem(null)
+          }}
+          onConfirm={handleConfirmEntry}
         />
       )}
 
